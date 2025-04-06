@@ -7,7 +7,13 @@ import torch
 import torch.nn.functional as F
 
 from .backbone import BertRelationClassifier, BertTextClassifier
-from .dataset import BERTTorchTextClassDataset, BERTTorchRelationClassDataset, BaseDataset, TextDataset, RelationDataset
+from .dataset import (
+    BERTTorchTextClassDataset,
+    BERTTorchRelationClassDataset,
+    BaseDataset,
+    TextDataset,
+    RelationDataset,
+)
 
 
 def set_seed(seed):
@@ -58,7 +64,7 @@ def calc_cmi_matrix(y, L):
     for c, c_idx in enumerate(c_idx_l):
         for i in range(m):
             card_i = lf_cardinality[i]
-            cond_probs[c, i][:len(card_i)] = array_to_marginals(L[:, i][c_idx], card_i)
+            cond_probs[c, i][: len(card_i)] = array_to_marginals(L[:, i][c_idx], card_i)
 
     cmi_matrix = -np.ones((m, m)) * np.inf
     for i in range(m):
@@ -73,9 +79,15 @@ def calc_cmi_matrix(y, L):
                 cmi = 0.0
                 for ci_idx, ci in enumerate(card_i):
                     for cj_idx, cj in enumerate(card_j):
-                        p = np.sum(np.logical_and(L_i[c_idx] == ci, L_j[c_idx] == cj)) / n_c
+                        p = (
+                            np.sum(np.logical_and(L_i[c_idx] == ci, L_j[c_idx] == cj))
+                            / n_c
+                        )
                         if p > 0:
-                            cur = p * np.log(p / (cond_probs[c, i, ci_idx] * cond_probs[c, j, cj_idx]))
+                            cur = p * np.log(
+                                p
+                                / (cond_probs[c, i, ci_idx] * cond_probs[c, j, cj_idx])
+                            )
                             cmi += cur
 
                 cmi_ij += class_marginal[c] * cmi
@@ -96,10 +108,10 @@ def cluster_based_accuracy_variance(Y, L, cluster_labels):
 
 
 def cross_entropy_with_probs(
-        input: torch.Tensor,
-        target: torch.Tensor,
-        weight: Optional[torch.Tensor] = None,
-        reduction: str = "mean",
+    input: torch.Tensor,
+    target: torch.Tensor,
+    weight: Optional[torch.Tensor] = None,
+    reduction: str = "mean",
 ) -> torch.Tensor:
     """Calculate cross-entropy loss when targets are probabilities (floats), not ints.
 
@@ -139,11 +151,14 @@ def cross_entropy_with_probs(
         input = input.squeeze()
         if target.ndim == 2:
             target = target[:, 1]
-        return F.binary_cross_entropy_with_logits(input, target, weight=weight, reduction=reduction)
+        return F.binary_cross_entropy_with_logits(
+            input, target, weight=weight, reduction=reduction
+        )
     else:
-
         if target.ndim == 1:
-            return F.cross_entropy(input, target.long(), weight=weight, reduction=reduction)
+            return F.cross_entropy(
+                input, target.long(), weight=weight, reduction=reduction
+            )
 
         num_points, num_classes = input.shape
         # Note that t.new_zeros, t.new_full put tensor on same device as t
@@ -171,7 +186,7 @@ def construct_collate_fn_trunc_pad(mask: str):
         batch_mask = batch[mask]
         batch_max_seq = batch_mask.sum(dim=1).max()
         for k, v in batch.items():
-            if k not in ['weak_labels', 'features']:
+            if k not in ["weak_labels", "features"]:
                 ndim = batch[k].ndim
                 if ndim > 1:
                     if ndim == 2:
@@ -185,9 +200,14 @@ def construct_collate_fn_trunc_pad(mask: str):
 
 def create_tuples(dataset: Union[BaseDataset, np.ndarray]):
     ids = np.repeat(np.array(range(len(dataset))), len(dataset.weak_labels[0]))
-    workers = np.repeat(
-        np.array([i for i in range(len(dataset.weak_labels[0]))]), len(dataset.weak_labels)
-    ).reshape(len(dataset.weak_labels[0]), -1).T.reshape(-1)
+    workers = (
+        np.repeat(
+            np.array([i for i in range(len(dataset.weak_labels[0]))]),
+            len(dataset.weak_labels),
+        )
+        .reshape(len(dataset.weak_labels[0]), -1)
+        .T.reshape(-1)
+    )
     classes = np.array(dataset.weak_labels).reshape(-1)
 
     tuples = np.vstack((ids, workers, classes))

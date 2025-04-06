@@ -19,8 +19,9 @@ def get_deps_from_inverse_sig(J, thresh=0.2):
 def learn_structure(L, thresh=1.5):
     N = float(np.shape(L)[0])
     M = L.shape[1]
-    sigma_O = (np.dot(L.T, L)) / (N - 1) - \
-              np.outer(np.mean(L, axis=0), np.mean(L, axis=0))
+    sigma_O = (np.dot(L.T, L)) / (N - 1) - np.outer(
+        np.mean(L, axis=0), np.mean(L, axis=0)
+    )
 
     # bad code
     O = 1 / 2 * (sigma_O + sigma_O.T)
@@ -40,7 +41,10 @@ def learn_structure(L, thresh=1.5):
     gamma = 1e-8
 
     objective = cp.Minimize(
-        0.5 * (cp.norm(R @ O_root, 'fro') ** 2) - cp.trace(R) + lam * (gamma * cp.pnorm(S, 1) + cp.norm(L_cvx, "nuc")))
+        0.5 * (cp.norm(R @ O_root, "fro") ** 2)
+        - cp.trace(R)
+        + lam * (gamma * cp.pnorm(S, 1) + cp.norm(L_cvx, "nuc"))
+    )
     constraints = [R == S - L_cvx, L_cvx >> 0]
 
     prob = cp.Problem(objective, constraints)

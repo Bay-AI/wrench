@@ -37,25 +37,28 @@ def initialize_Y_p(Y_p, L, n_class):
 
 
 class DawidSkene(BaseLabelModel):
-    def __init__(self,
-                 n_epochs: Optional[int] = 10000,
-                 tolerance: Optional[float] = 1e-5,
-                 **kwargs: Any):
+    def __init__(
+        self,
+        n_epochs: Optional[int] = 10000,
+        tolerance: Optional[float] = 1e-5,
+        **kwargs: Any,
+    ):
         super().__init__()
         self.hyperparas = {
-            'n_epochs' : n_epochs,
-            'tolerance': tolerance,
+            "n_epochs": n_epochs,
+            "tolerance": tolerance,
         }
 
-    def fit(self,
-            dataset_train: Union[BaseDataset, np.ndarray],
-            dataset_valid: Optional[Union[BaseDataset, np.ndarray]] = None,
-            y_valid: Optional[np.ndarray] = None,
-            n_class: Optional[int] = None,
-            balance: Optional[np.ndarray] = None,
-            verbose: Optional[bool] = False,
-            **kwargs: Any):
-
+    def fit(
+        self,
+        dataset_train: Union[BaseDataset, np.ndarray],
+        dataset_valid: Optional[Union[BaseDataset, np.ndarray]] = None,
+        y_valid: Optional[np.ndarray] = None,
+        n_class: Optional[int] = None,
+        balance: Optional[np.ndarray] = None,
+        verbose: Optional[bool] = False,
+        **kwargs: Any,
+    ):
         self._update_hyperparas(**kwargs)
         if isinstance(dataset_train, BaseDataset):
             if n_class is not None:
@@ -70,12 +73,11 @@ class DawidSkene(BaseLabelModel):
         Y_p = self._initialize_Y_p(L)
         L_aug = self._initialize_L_aug(L)
 
-        max_iter = self.hyperparas['n_epochs']
-        tol = self.hyperparas['tolerance']
+        max_iter = self.hyperparas["n_epochs"]
+        tol = self.hyperparas["tolerance"]
         old_class_marginals = None
         old_error_rates = None
         for iter in trange(max_iter):
-
             # M-step
             (class_marginals, error_rates) = self._m_step(L_aug, Y_p)
 
@@ -87,9 +89,11 @@ class DawidSkene(BaseLabelModel):
 
             # check for convergence
             if old_class_marginals is not None:
-                class_marginals_diff = np.sum(np.abs(class_marginals - old_class_marginals))
+                class_marginals_diff = np.sum(
+                    np.abs(class_marginals - old_class_marginals)
+                )
                 error_rates_diff = np.sum(np.abs(error_rates - old_error_rates))
-                if (class_marginals_diff < tol and error_rates_diff < tol):
+                if class_marginals_diff < tol and error_rates_diff < tol:
                     break
 
             # update current values
@@ -159,13 +163,15 @@ class DawidSkene(BaseLabelModel):
             temp = log_L + np.log(single_likelihood)
 
             if np.isnan(temp) or np.isinf(temp):
-                warnings.warn('!')
+                warnings.warn("!")
 
             log_L = temp
 
         return log_L
 
-    def predict_proba(self, dataset: Union[BaseDataset, np.ndarray], **kwargs: Any) -> np.ndarray:
+    def predict_proba(
+        self, dataset: Union[BaseDataset, np.ndarray], **kwargs: Any
+    ) -> np.ndarray:
         L = check_weak_labels(dataset)
         L_aug = self._initialize_L_aug(L)
         Y_p = self._e_step(L_aug, self.class_marginals, self.error_rates)

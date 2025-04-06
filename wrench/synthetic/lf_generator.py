@@ -30,9 +30,12 @@ class Expression(ABC):
         raise NotImplementedError
 
     def overlap(self, other):
-        if self.exclude(other): return False
-        if self.include(other): return False
-        if other.include(self): return False
+        if self.exclude(other):
+            return False
+        if self.include(other):
+            return False
+        if other.include(self):
+            return False
         return True
 
 
@@ -42,7 +45,7 @@ class UnaryExpression(Expression):
         self.threshold = threshold
 
     def apply(self, x: np.ndarray):
-        assert x.ndim == 2, 'dimension of x should be 2!'
+        assert x.ndim == 2, "dimension of x should be 2!"
         return self.apply_(x[:, self.idx])
 
     @abstractmethod
@@ -74,9 +77,9 @@ class UnaryExpression(Expression):
         raise NotImplementedError
 
     def __str__(self):
-        s = f'=====[{self.__class__}]=====\n'
-        s += f'[idx] {self.idx}\n'
-        s += f'[threshold] {self.threshold}\n'
+        s = f"=====[{self.__class__}]=====\n"
+        s += f"[idx] {self.idx}\n"
+        s += f"[threshold] {self.threshold}\n"
         return s
 
 
@@ -146,14 +149,23 @@ class InIntervalExpression(UnaryExpression):
         if isinstance(other, EqualExpression):
             return self.threshold[0] < other.threshold < self.threshold[1]
         if isinstance(other, InIntervalExpression):
-            return self.threshold[0] < other.threshold[0] and other.threshold[1] < self.threshold[1]
+            return (
+                self.threshold[0] < other.threshold[0]
+                and other.threshold[1] < self.threshold[1]
+            )
         return False
 
     def exclude_(self, other: Expression):
         if isinstance(other, EqualExpression):
-            return other.threshold < self.threshold[0] or other.threshold > self.threshold[1]
+            return (
+                other.threshold < self.threshold[0]
+                or other.threshold > self.threshold[1]
+            )
         if isinstance(other, InIntervalExpression):
-            return other.threshold[0] > self.threshold[1] or other.threshold[1] < self.threshold[0]
+            return (
+                other.threshold[0] > self.threshold[1]
+                or other.threshold[1] < self.threshold[0]
+            )
         return other.exclude(self)
 
 
@@ -163,22 +175,34 @@ class OutIntervalExpression(UnaryExpression):
 
     def include_(self, other: Expression):
         if isinstance(other, EqualExpression):
-            return self.threshold[0] > other.threshold or other.threshold > self.threshold[1]
+            return (
+                self.threshold[0] > other.threshold
+                or other.threshold > self.threshold[1]
+            )
         if isinstance(other, GreaterExpression):
             return self.threshold[1] < other.threshold
         if isinstance(other, LessExpression):
             return self.threshold[0] > other.threshold
         if isinstance(other, InIntervalExpression):
-            return self.threshold[0] > other.threshold[1] or other.threshold[0] > self.threshold[1]
+            return (
+                self.threshold[0] > other.threshold[1]
+                or other.threshold[0] > self.threshold[1]
+            )
         if isinstance(other, OutIntervalExpression):
-            return self.threshold[0] > other.threshold[0] and other.threshold[1] > self.threshold[1]
+            return (
+                self.threshold[0] > other.threshold[0]
+                and other.threshold[1] > self.threshold[1]
+            )
         return False
 
     def exclude_(self, other: Expression):
         if isinstance(other, EqualExpression):
             return self.threshold[0] < other.threshold < self.threshold[1]
         if isinstance(other, InIntervalExpression):
-            return other.threshold[0] > self.threshold[0] and other.threshold[1] < self.threshold[1]
+            return (
+                other.threshold[0] > self.threshold[0]
+                and other.threshold[1] < self.threshold[1]
+            )
         return False
 
 
@@ -226,7 +250,7 @@ class NGramExpression(Expression):
         self.ngram = ngram
 
     def apply(self, x: np.ndarray):
-        assert x.ndim == 2, 'dimension of x should be 2!'
+        assert x.ndim == 2, "dimension of x should be 2!"
         applied = x[:, self.idx] > self.threshold
         if isinstance(applied, csr_matrix):
             applied = applied.toarray().squeeze()
@@ -239,15 +263,17 @@ class NGramExpression(Expression):
         raise NotImplementedError
 
     def __str__(self):
-        s = f'=====[{self.__class__}]=====\n'
-        s += f'[idx] {self.idx}\n'
-        s += f'[threshold] {self.threshold}\n'
-        s += f'[ngram] {self.ngram}\n'
+        s = f"=====[{self.__class__}]=====\n"
+        s += f"[idx] {self.idx}\n"
+        s += f"[threshold] {self.threshold}\n"
+        s += f"[ngram] {self.ngram}\n"
         return s
 
 
 class LF:
-    def __init__(self, e: Expression, label: int, acc: float = -1.0, propensity: float = -1.0):
+    def __init__(
+        self, e: Expression, label: int, acc: float = -1.0, propensity: float = -1.0
+    ):
         self.e = e
         self.label = label
         self.acc = acc
@@ -296,7 +322,7 @@ class NGramLFApplier(AbstractLFApplier):
 
     def apply(self, dataset: Union[TextDataset, csr_matrix]):
         if isinstance(dataset, TextDataset):
-            corpus = [i['text'] for i in dataset.examples]
+            corpus = [i["text"] for i in dataset.examples]
             X = self.vectorizer.transform(corpus)
         else:
             X = dataset
@@ -307,9 +333,9 @@ class NGramLFApplier(AbstractLFApplier):
 class NoEnoughLFError(Exception):
     def __init__(self, label=None):
         if label is None:
-            self.message = 'cannot find enough lfs, please lower the min support or the min acc gain!'
+            self.message = "cannot find enough lfs, please lower the min support or the min acc gain!"
         else:
-            self.message = f'cannot find any lf for label {label}, please lower the min support or the min acc gain!'
+            self.message = f"cannot find any lf for label {label}, please lower the min support or the min acc gain!"
         super().__init__(self.message)
 
 
@@ -318,13 +344,14 @@ class AbstractLFGenerator(ABC):
     X: Union[np.ndarray, csr_matrix]
     label_to_candidate_lfs: dict
 
-    def __init__(self,
-                 dataset: Union[BaseDataset, np.ndarray],
-                 y: Optional[np.ndarray] = None,
-                 min_acc_gain: float = 0.1,
-                 min_support: float = 0.01,
-                 random_state=None
-                 ):
+    def __init__(
+        self,
+        dataset: Union[BaseDataset, np.ndarray],
+        y: Optional[np.ndarray] = None,
+        min_acc_gain: float = 0.1,
+        min_support: float = 0.01,
+        random_state=None,
+    ):
         if isinstance(dataset, BaseDataset):
             self.Y = np.array(dataset.labels)
         else:
@@ -346,44 +373,54 @@ class AbstractLFGenerator(ABC):
 
     def check_candidate_lfs_enough_(self, n_lfs: Union[int, List[int]]):
         if isinstance(n_lfs, int):
-            assert sum(map(len, self.label_to_candidate_lfs.values())) > n_lfs, NoEnoughLFError()
+            assert sum(map(len, self.label_to_candidate_lfs.values())) > n_lfs, (
+                NoEnoughLFError()
+            )
         else:
             assert len(n_lfs) == self.n_class
             labels = list(range(self.n_class))
             for label, n_lfs_i in zip(labels, n_lfs):
-                assert len(self.label_to_candidate_lfs[label]) > n_lfs_i, NoEnoughLFError(label)
+                assert len(self.label_to_candidate_lfs[label]) > n_lfs_i, (
+                    NoEnoughLFError(label)
+                )
 
     def return_candidate_lfs(self):
         return list(chain.from_iterable(self.label_to_candidate_lfs.values()))
 
     def generate(self, mode: str, **kwargs):
-        if mode == 'exhaustive':
+        if mode == "exhaustive":
             return self.exhaustive_generate()
-        if mode == 'random':
+        if mode == "random":
             return self.random_generate(**kwargs)
-        if mode == 'accurate':
+        if mode == "accurate":
             return self.accurate_generate(**kwargs)
-        if mode == 'correlated':
+        if mode == "correlated":
             return self.correlated_generate(**kwargs)
-        if mode == 'cluster_dependent':
+        if mode == "cluster_dependent":
             return self.cluster_dependent_generate(**kwargs)
-        raise NotImplementedError(f'generate mode {mode} is not implemented!')
+        raise NotImplementedError(f"generate mode {mode} is not implemented!")
 
     def exhaustive_generate(self) -> AbstractLFApplier:
         return self.lf_applier_type(self.return_candidate_lfs())
 
-    def random_generate(self, n_lfs: Union[int, List[int]] = 10, duplicated_lf=False) -> AbstractLFApplier:
+    def random_generate(
+        self, n_lfs: Union[int, List[int]] = 10, duplicated_lf=False
+    ) -> AbstractLFApplier:
         if not duplicated_lf:
             self.check_candidate_lfs_enough_(n_lfs)
         if isinstance(n_lfs, int):
             candidate_lfs = self.return_candidate_lfs()
-            lfs = list(self.generator.choice(candidate_lfs, n_lfs, replace=duplicated_lf))
+            lfs = list(
+                self.generator.choice(candidate_lfs, n_lfs, replace=duplicated_lf)
+            )
         else:
             labels = list(range(self.n_class))
             lfs = []
             for label, n_lfs_i in zip(labels, n_lfs):
                 candidate_lfs = self.label_to_candidate_lfs[label]
-                lfs_i = list(self.generator.choice(candidate_lfs, n_lfs_i, replace=duplicated_lf))
+                lfs_i = list(
+                    self.generator.choice(candidate_lfs, n_lfs_i, replace=duplicated_lf)
+                )
                 lfs += lfs_i
         return self.lf_applier_type(lfs)
 
@@ -400,10 +437,11 @@ class AbstractLFGenerator(ABC):
                 lfs += sorted(candidate_lfs, key=lambda x: -x.acc)[:n_lfs_i]
         return self.lf_applier_type(lfs)
 
-    def correlated_generate(self,
-                            n_lfs: Union[int, List[int]] = 20,
-                            # n_correlated_lfs: Union[int, List[int]] = 10,
-                            ) -> AbstractLFApplier:
+    def correlated_generate(
+        self,
+        n_lfs: Union[int, List[int]] = 20,
+        # n_correlated_lfs: Union[int, List[int]] = 10,
+    ) -> AbstractLFApplier:
         # assert type(n_lfs) == type(n_correlated_lfs)
         self.check_candidate_lfs_enough_(n_lfs)
         if isinstance(n_lfs, int):
@@ -431,7 +469,9 @@ class AbstractLFGenerator(ABC):
 
                 cmi_matrix = calc_cmi_matrix(Y, L)
 
-                row_max, col_max = np.unravel_index(cmi_matrix.argmax(), cmi_matrix.shape)
+                row_max, col_max = np.unravel_index(
+                    cmi_matrix.argmax(), cmi_matrix.shape
+                )
                 lfs_idx = [row_max, col_max]
                 while len(lfs_idx) < n_lfs_i:
                     sub_cmi_matrix = cmi_matrix[lfs_idx, :]
@@ -441,7 +481,9 @@ class AbstractLFGenerator(ABC):
                 lfs += [candidate_lfs[i] for i in lfs_idx]
         return self.lf_applier_type(lfs)
 
-    def cluster_dependent_generate(self, n_lfs: Union[int, List[int]] = 10, n_clusters=5) -> AbstractLFApplier:
+    def cluster_dependent_generate(
+        self, n_lfs: Union[int, List[int]] = 10, n_clusters=5
+    ) -> AbstractLFApplier:
         self.check_candidate_lfs_enough_(n_lfs)
         kmeans = KMeans(n_clusters=n_clusters, random_state=self.generator).fit(self.X)
         cluster_labels = kmeans.labels_
@@ -449,7 +491,11 @@ class AbstractLFGenerator(ABC):
             candidate_lfs = self.return_candidate_lfs()
             L = np.stack([lf.apply(self.X) for lf in candidate_lfs]).T
             acc_var = np.array(
-                [cluster_based_accuracy_variance(self.Y, L[:, i], cluster_labels) for i in range(L.shape[1])])
+                [
+                    cluster_based_accuracy_variance(self.Y, L[:, i], cluster_labels)
+                    for i in range(L.shape[1])
+                ]
+            )
             argsort_idx = np.argsort(-acc_var)
             lfs = [candidate_lfs[i] for i in argsort_idx[:n_lfs]]
         else:
@@ -459,21 +505,28 @@ class AbstractLFGenerator(ABC):
                 candidate_lfs = self.label_to_candidate_lfs[label]
                 L = np.stack([lf.apply(self.X) for lf in candidate_lfs]).T
                 acc_var = np.array(
-                    [cluster_based_accuracy_variance(self.Y, L[:, i], cluster_labels) for i in range(L.shape[1])])
+                    [
+                        cluster_based_accuracy_variance(self.Y, L[:, i], cluster_labels)
+                        for i in range(L.shape[1])
+                    ]
+                )
                 argsort_idx = np.argsort(-acc_var)
                 lfs += [candidate_lfs[i] for i in argsort_idx[:n_lfs_i]]
         return self.lf_applier_type(lfs)
 
 
 class FeatureLFGenerator(AbstractLFGenerator):
-    def __init__(self,
-                 dataset: Union[BaseDataset, np.ndarray],
-                 y: Optional[np.ndarray] = None,
-                 min_acc_gain: float = 0.1,
-                 min_support: float = 0.01,
-                 random_state=None
-                 ):
-        super(FeatureLFGenerator, self).__init__(dataset, y, min_acc_gain, min_support, random_state)
+    def __init__(
+        self,
+        dataset: Union[BaseDataset, np.ndarray],
+        y: Optional[np.ndarray] = None,
+        min_acc_gain: float = 0.1,
+        min_support: float = 0.01,
+        random_state=None,
+    ):
+        super(FeatureLFGenerator, self).__init__(
+            dataset, y, min_acc_gain, min_support, random_state
+        )
         if isinstance(dataset, BaseDataset):
             self.X = np.array(dataset.features)
         else:
@@ -481,7 +534,9 @@ class FeatureLFGenerator(AbstractLFGenerator):
             self.X = dataset
         self.n_feature = self.X.shape[1]
         self.bin_list = self.get_bin_egdes(self.X, self.min_support)
-        self.label_to_candidate_lfs, self.idx_to_lfs, self.label_to_idx_to_lfs = self.generate_label_to_lfs()
+        self.label_to_candidate_lfs, self.idx_to_lfs, self.label_to_idx_to_lfs = (
+            self.generate_label_to_lfs()
+        )
         self.lf_applier_type = FeatureLFApplier
 
     @staticmethod
@@ -496,7 +551,8 @@ class FeatureLFGenerator(AbstractLFGenerator):
             interval = bin_size
             while interval < n_data:
                 thres = x[argsort_idx[interval]]
-                if thres == max_x: break
+                if thres == max_x:
+                    break
                 while interval < n_data:
                     if x[argsort_idx[interval - 1]] == thres:
                         interval += 1
@@ -535,13 +591,16 @@ class FeatureLFGenerator(AbstractLFGenerator):
             for idx in range(self.n_feature):
                 bin_list_i = self.bin_list[idx]
                 x = self.X[:, idx]
-                idx_lfs = self.generate_half_bounded_lf(x, y, idx, label, bin_list_i, min_acc) \
-                          + self.generate_interval_lf(x, y, idx, label, bin_list_i, min_acc)
+                idx_lfs = self.generate_half_bounded_lf(
+                    x, y, idx, label, bin_list_i, min_acc
+                ) + self.generate_interval_lf(x, y, idx, label, bin_list_i, min_acc)
                 if len(idx_lfs) > 1:
                     idx_to_lfs_i[idx] = idx_lfs
                     idx_to_lfs[idx] += idx_lfs
             lfs_for_label = list(chain.from_iterable(idx_to_lfs_i.values()))
-            assert len(lfs_for_label) > 1, f'cannot find any lf for label {label}, please lower the min support or the min acc gain!'
+            assert len(lfs_for_label) > 1, (
+                f"cannot find any lf for label {label}, please lower the min support or the min acc gain!"
+            )
             label_to_idx_to_lfs[label] = idx_to_lfs_i
             label_to_lfs[label] = list(chain.from_iterable(idx_to_lfs_i.values()))
         return label_to_lfs, idx_to_lfs, label_to_idx_to_lfs
@@ -582,19 +641,30 @@ class FeatureLFGenerator(AbstractLFGenerator):
             else:
                 out_interval_idx = np.logical_or(thres[0] > x, x > thres[1])
                 out_interval_acc = self.calc_acc(y[out_interval_idx])
-                if out_interval_acc > min_acc and np.sum(out_interval_acc) > self.min_support:
+                if (
+                    out_interval_acc > min_acc
+                    and np.sum(out_interval_acc) > self.min_support
+                ):
                     propensity = np.sum(out_interval_idx) / n
                     e = OutIntervalExpression(idx=idx, threshold=thres)
-                    lf = LF(e=e, label=label, acc=out_interval_acc, propensity=propensity)
+                    lf = LF(
+                        e=e, label=label, acc=out_interval_acc, propensity=propensity
+                    )
                     lfs.append(lf)
         return lfs
 
-    def one_feature_one_lf_generate(self, n_lfs: Union[int, List[int]] = 10) -> FeatureLFApplier:
+    def one_feature_one_lf_generate(
+        self, n_lfs: Union[int, List[int]] = 10
+    ) -> FeatureLFApplier:
         if isinstance(n_lfs, int):
             try:
-                sampled_idx = self.generator.choice(list(self.idx_to_lfs.keys()), size=n_lfs)
-                lfs = [self.generator.choice(self.idx_to_lfs[idx]) for idx in sampled_idx]
-            except ValueError as e:
+                sampled_idx = self.generator.choice(
+                    list(self.idx_to_lfs.keys()), size=n_lfs
+                )
+                lfs = [
+                    self.generator.choice(self.idx_to_lfs[idx]) for idx in sampled_idx
+                ]
+            except ValueError:
                 raise NoEnoughLFError()
         else:
             assert len(n_lfs) == self.n_class
@@ -603,38 +673,46 @@ class FeatureLFGenerator(AbstractLFGenerator):
             for label, n_lfs_i in zip(labels, n_lfs):
                 idx_to_lf = self.label_to_idx_to_lfs[label]
                 try:
-                    sampled_idx = self.generator.choice(list(idx_to_lf.keys()), size=n_lfs_i)
-                    lfs_i = [self.generator.choice(idx_to_lf[idx]) for idx in sampled_idx]
-                except ValueError as e:
+                    sampled_idx = self.generator.choice(
+                        list(idx_to_lf.keys()), size=n_lfs_i
+                    )
+                    lfs_i = [
+                        self.generator.choice(idx_to_lf[idx]) for idx in sampled_idx
+                    ]
+                except ValueError:
                     raise NoEnoughLFError(label)
                 lfs += lfs_i
         return FeatureLFApplier(lfs)
 
 
 class NGramLFGenerator(AbstractLFGenerator):
-    def __init__(self,
-                 dataset: TextDataset,
-                 y: Optional[np.ndarray] = None,
-                 vectorizer: CountVectorizer = None,
-                 ngram_range=(1, 1),
-                 min_acc_gain: float = 0.1,
-                 min_support: float = 0.01,
-                 random_state=None
-                 ):
-
-        super(NGramLFGenerator, self).__init__(dataset, y, min_acc_gain, min_support, random_state)
+    def __init__(
+        self,
+        dataset: TextDataset,
+        y: Optional[np.ndarray] = None,
+        vectorizer: CountVectorizer = None,
+        ngram_range=(1, 1),
+        min_acc_gain: float = 0.1,
+        min_support: float = 0.01,
+        random_state=None,
+    ):
+        super(NGramLFGenerator, self).__init__(
+            dataset, y, min_acc_gain, min_support, random_state
+        )
         if vectorizer is None:
-            vectorizer = CountVectorizer(strip_accents='ascii',
-                                         # stop_words='english',
-                                         ngram_range=ngram_range,
-                                         analyzer='word',
-                                         max_df=0.90,
-                                         min_df=self.min_support / self.n_data,
-                                         max_features=None,
-                                         vocabulary=None,
-                                         binary=False)
+            vectorizer = CountVectorizer(
+                strip_accents="ascii",
+                # stop_words='english',
+                ngram_range=ngram_range,
+                analyzer="word",
+                max_df=0.90,
+                min_df=self.min_support / self.n_data,
+                max_features=None,
+                vocabulary=None,
+                binary=False,
+            )
 
-        corpus = [i['text'] for i in self.dataset.examples]
+        corpus = [i["text"] for i in self.dataset.examples]
         self.X = vectorizer.fit_transform(corpus)
         self.vectorizer = vectorizer
         self.idx_to_ngram = vectorizer.get_feature_names()
@@ -658,6 +736,8 @@ class NGramLFGenerator(AbstractLFGenerator):
                     e = NGramExpression(idx=idx, threshold=0, ngram=ngram)
                     lf = LF(e=e, label=label, acc=exist_acc, propensity=propensity)
                     lfs.append(lf)
-            assert len(lfs) > 1, f'cannot find any lf for label {label}, please lower the min support or the min acc gain!'
+            assert len(lfs) > 1, (
+                f"cannot find any lf for label {label}, please lower the min support or the min acc gain!"
+            )
             label_to_lfs[label] = lfs
         return label_to_lfs

@@ -7,7 +7,11 @@ import torch.nn.functional as F
 def consistency_loss(logits_w1, logits_w2):
     logits_w2 = logits_w2.detach()
     assert logits_w1.size() == logits_w2.size()
-    return F.mse_loss(torch.softmax(logits_w1, dim=-1), torch.softmax(logits_w2, dim=-1), reduction='mean')
+    return F.mse_loss(
+        torch.softmax(logits_w1, dim=-1),
+        torch.softmax(logits_w2, dim=-1),
+        reduction="mean",
+    )
 
 
 class BatchNormController:
@@ -21,16 +25,18 @@ class BatchNormController:
         assert self.backup == {}
         for name, m in model.named_modules():
             if isinstance(m, nn.SyncBatchNorm) or isinstance(m, nn.BatchNorm2d):
-                self.backup[name + '.running_mean'] = m.running_mean.data.clone()
-                self.backup[name + '.running_var'] = m.running_var.data.clone()
-                self.backup[name + '.num_batches_tracked'] = m.num_batches_tracked.data.clone()
+                self.backup[name + ".running_mean"] = m.running_mean.data.clone()
+                self.backup[name + ".running_var"] = m.running_var.data.clone()
+                self.backup[name + ".num_batches_tracked"] = (
+                    m.num_batches_tracked.data.clone()
+                )
 
     def unfreeze_bn(self, model):
         for name, m in model.named_modules():
             if isinstance(m, nn.SyncBatchNorm) or isinstance(m, nn.BatchNorm2d):
-                m.running_mean.data = self.backup[name + '.running_mean']
-                m.running_var.data = self.backup[name + '.running_var']
-                m.num_batches_tracked.data = self.backup[name + '.num_batches_tracked']
+                m.running_mean.data = self.backup[name + ".running_mean"]
+                m.running_var.data = self.backup[name + ".running_var"]
+                m.num_batches_tracked.data = self.backup[name + ".num_batches_tracked"]
         self.backup = {}
 
 

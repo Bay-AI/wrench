@@ -1,4 +1,4 @@
-""""
+""" "
 https://github.com/BatsResearch/labelmodels
 """
 
@@ -60,17 +60,21 @@ class LabelModel(nn.Module):
 
         # Sets up optimization hyperparameters
         optimizer = torch.optim.SGD(
-            self.parameters(), lr=config.step_size, momentum=config.momentum,
-            weight_decay=0)
+            self.parameters(),
+            lr=config.step_size,
+            momentum=config.momentum,
+            weight_decay=0,
+        )
         if config.step_schedule is not None and config.step_size_mult is not None:
             scheduler = torch.optim.lr_scheduler.MultiStepLR(
-                optimizer, config.step_schedule, gamma=config.step_size_mult)
+                optimizer, config.step_schedule, gamma=config.step_size_mult
+            )
         else:
             scheduler = None
 
         # Iterates over epochs
         for epoch in range(config.epochs):
-            logging.info('Epoch {}/{}'.format(epoch + 1, config.epochs))
+            logging.info("Epoch {}/{}".format(epoch + 1, config.epochs))
             if scheduler is not None:
                 scheduler.step()
 
@@ -88,7 +92,7 @@ class LabelModel(nn.Module):
                 optimizer.step()
                 running_loss += loss.item()
             epoch_loss = running_loss / len(batches)
-            logging.info('Train Loss: %.6f', epoch_loss)
+            logging.info("Train Loss: %.6f", epoch_loss)
 
     def _get_regularization_loss(self):
         """Gets the value of the regularization loss for the current values of
@@ -126,8 +130,7 @@ class ClassConditionalLabelModel(LabelModel):
         # Converts init_acc to log scale
         init_acc = -1 * np.log(1.0 / init_acc - 1) / 2
 
-        init_param = torch.tensor(
-            [[init_acc] * num_classes for _ in range(num_lfs)])
+        init_param = torch.tensor([[init_acc] * num_classes for _ in range(num_lfs)])
         self.accuracy = nn.Parameter(init_param)
         self.propensity = nn.Parameter(torch.zeros([num_lfs]))
 
@@ -250,8 +253,15 @@ class NaiveBayes(ClassConditionalLabelModel):
     Neural Information Processing Systems, 2016.
     """
 
-    def __init__(self, num_classes, num_lfs, init_acc=.9, acc_prior=0.025,
-                 balance_prior=0.025, learn_class_balance=True):
+    def __init__(
+        self,
+        num_classes,
+        num_lfs,
+        init_acc=0.9,
+        acc_prior=0.025,
+        balance_prior=0.025,
+        learn_class_balance=True,
+    ):
         """Constructor.
         Initializes labeling function accuracies using optional argument and all
         other model parameters uniformly.
@@ -268,7 +278,8 @@ class NaiveBayes(ClassConditionalLabelModel):
         """
         super().__init__(num_classes, num_lfs, init_acc, acc_prior)
         self.class_balance = nn.Parameter(
-            torch.zeros([num_classes]), requires_grad=learn_class_balance)
+            torch.zeros([num_classes]), requires_grad=learn_class_balance
+        )
 
         self.balance_prior = balance_prior
 
@@ -307,8 +318,7 @@ class NaiveBayes(ClassConditionalLabelModel):
         # Converts to CSR to standardize input
         votes = sparse.csr_matrix(votes, dtype=np.int)
 
-        batches = self._create_minibatches(
-            votes, config.batch_size, shuffle_rows=True)
+        batches = self._create_minibatches(votes, config.batch_size, shuffle_rows=True)
         self._do_estimate_label_model(batches, config)
 
     def get_label_distribution(self, votes):
@@ -327,7 +337,7 @@ class NaiveBayes(ClassConditionalLabelModel):
         batches = self._create_minibatches(votes, 4096, shuffle_rows=False)
 
         offset = 0
-        for votes, in batches:
+        for (votes,) in batches:
             class_balance = self._get_norm_class_balance()
             lf_likelihood = self._get_labeling_function_likelihoods(votes)
             jll = class_balance + lf_likelihood
@@ -364,9 +374,12 @@ class NaiveBayes(ClassConditionalLabelModel):
             votes = votes[index, :]
 
         # Creates minibatches
-        batches = [(sparse.coo_matrix(
-            votes[i * batch_size: (i + 1) * batch_size, :],
-            copy=True),)
+        batches = [
+            (
+                sparse.coo_matrix(
+                    votes[i * batch_size : (i + 1) * batch_size, :], copy=True
+                ),
+            )
             for i in range(int(np.ceil(votes.shape[0] / batch_size)))
         ]
 

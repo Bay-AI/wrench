@@ -44,7 +44,9 @@ def get_pin_memory():
 
 
 class efficient_training(ContextDecorator):
-    def __init__(self, amp: bool = False, num_workers: int = 0, pin_memory: bool = False):
+    def __init__(
+        self, amp: bool = False, num_workers: int = 0, pin_memory: bool = False
+    ):
         self.prev_amp = get_amp_flag()
         self.prev_num_workers = get_num_workers()
         self.prev_pin_memory = get_pin_memory()

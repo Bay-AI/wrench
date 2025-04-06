@@ -52,6 +52,6 @@ def logsumexp(x, dim=None, keepdim=False):
     x = torch.where(
         (xm == np.inf) | (xm == -np.inf),
         xm,
-        xm + torch.logsumexp(x - xm, dim=dim, keepdim=True)
+        xm + torch.logsumexp(x - xm, dim=dim, keepdim=True),
     )
     return x if keepdim else x.squeeze(dim)

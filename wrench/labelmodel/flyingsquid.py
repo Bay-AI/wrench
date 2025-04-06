@@ -20,16 +20,17 @@ class FlyingSquid(BaseLabelModel):
         self.model = None
         self.n_class = None
 
-    def fit(self,
-            dataset_train: Union[BaseDataset, np.ndarray],
-            dataset_valid: Optional[Union[BaseDataset, np.ndarray]] = None,
-            y_valid: Optional[np.ndarray] = None,
-            n_class: Optional[int] = None,
-            balance: Optional[np.ndarray] = None,
-            dependency_graph: Optional[List] = [],
-            verbose: Optional[bool] = False,
-            **kwargs: Any):
-
+    def fit(
+        self,
+        dataset_train: Union[BaseDataset, np.ndarray],
+        dataset_valid: Optional[Union[BaseDataset, np.ndarray]] = None,
+        y_valid: Optional[np.ndarray] = None,
+        n_class: Optional[int] = None,
+        balance: Optional[np.ndarray] = None,
+        dependency_graph: Optional[List] = [],
+        verbose: Optional[bool] = False,
+        **kwargs: Any,
+    ):
         self._update_hyperparas(**kwargs)
         if isinstance(dataset_train, BaseDataset):
             if n_class is not None:
@@ -57,7 +58,12 @@ class FlyingSquid(BaseLabelModel):
                 L_i[target_mask] = 1
                 L_i[abstain_mask] = 0
                 L_i[other_mask] = -1
-                label_model.fit(L_train=L_i, class_balance=np.array([1 - balance[i], balance[i]]), verbose=verbose, **kwargs)
+                label_model.fit(
+                    L_train=L_i,
+                    class_balance=np.array([1 - balance[i], balance[i]]),
+                    verbose=verbose,
+                    **kwargs,
+                )
                 model.append(label_model)
         else:
             model = LabelModel(m=m, lambda_edges=dependency_graph)
@@ -70,7 +76,9 @@ class FlyingSquid(BaseLabelModel):
 
         self.model = model
 
-    def predict_proba(self, dataset: Union[BaseDataset, np.ndarray], **kwargs: Any) -> np.ndarray:
+    def predict_proba(
+        self, dataset: Union[BaseDataset, np.ndarray], **kwargs: Any
+    ) -> np.ndarray:
         L = check_weak_labels(dataset)
         if self.n_class > 2:
             probas = np.zeros((len(L), self.n_class))

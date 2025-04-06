@@ -14,31 +14,34 @@ ABSTAIN = -1
 
 
 class GenerativeModel(BaseLabelModel):
-    def __init__(self,
-                 lr: Optional[float] = 1e-4,
-                 l2: Optional[float] = 1e-1,
-                 n_epochs: Optional[int] = 100,
-                 seed: Optional[int] = None,
-                 **kwargs: Any):
+    def __init__(
+        self,
+        lr: Optional[float] = 1e-4,
+        l2: Optional[float] = 1e-1,
+        n_epochs: Optional[int] = 100,
+        seed: Optional[int] = None,
+        **kwargs: Any,
+    ):
         super().__init__()
         self.hyperparas = {
-            'lr'      : lr,
-            'l2'      : l2,
-            'n_epochs': n_epochs,
-            'seed'    : seed or np.random.randint(1e6),
+            "lr": lr,
+            "l2": l2,
+            "n_epochs": n_epochs,
+            "seed": seed or np.random.randint(1e6),
         }
         self.model = None
 
-    def fit(self,
-            dataset_train: Union[BaseDataset, np.ndarray],
-            dataset_valid: Optional[Union[BaseDataset, np.ndarray]] = None,
-            y_valid: Optional[np.ndarray] = None,
-            n_class: Optional[int] = None,
-            balance: Optional[np.ndarray] = None,
-            threads: Optional[int] = 10,
-            verbose: Optional[bool] = False,
-            **kwargs: Any):
-
+    def fit(
+        self,
+        dataset_train: Union[BaseDataset, np.ndarray],
+        dataset_valid: Optional[Union[BaseDataset, np.ndarray]] = None,
+        y_valid: Optional[np.ndarray] = None,
+        n_class: Optional[int] = None,
+        balance: Optional[np.ndarray] = None,
+        threads: Optional[int] = 10,
+        verbose: Optional[bool] = False,
+        **kwargs: Any,
+    ):
         self._update_hyperparas(**kwargs)
         if isinstance(dataset_train, BaseDataset):
             if n_class is not None:
@@ -58,20 +61,25 @@ class GenerativeModel(BaseLabelModel):
 
         ## TODO support multiclass class prior
         log_y_prior = np.log(balance)
-        label_model = SrcGenerativeModel(cardinality=n_class, class_prior=False, seed=self.hyperparas['seed'])
+        label_model = SrcGenerativeModel(
+            cardinality=n_class, class_prior=False, seed=self.hyperparas["seed"]
+        )
         label_model.train(
             L=L,
             init_class_prior=log_y_prior,
-            epochs=self.hyperparas['n_epochs'],
-            step_size=self.hyperparas['lr'],
-            reg_param=self.hyperparas['l2'],
+            epochs=self.hyperparas["n_epochs"],
+            step_size=self.hyperparas["lr"],
+            reg_param=self.hyperparas["l2"],
             verbose=verbose,
             cardinality=n_class,
-            threads=threads)
+            threads=threads,
+        )
 
         self.model = label_model
 
-    def predict_proba(self, dataset: Union[BaseDataset, np.ndarray], **kwargs: Any) -> np.ndarray:
+    def predict_proba(
+        self, dataset: Union[BaseDataset, np.ndarray], **kwargs: Any
+    ) -> np.ndarray:
         L = check_weak_labels(dataset)
         L = self.process_label_matrix(L)
         return self.model.predict_proba(L)

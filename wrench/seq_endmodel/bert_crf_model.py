@@ -17,17 +17,24 @@ from ..utils import construct_collate_fn_trunc_pad
 
 logger = logging.getLogger(__name__)
 
-collate_fn = construct_collate_fn_trunc_pad('mask')
+collate_fn = construct_collate_fn_trunc_pad("mask")
 
 
 class BERTTorchSeqDataset(Dataset):
-    def __init__(self, dataset: BaseSeqDataset, tokenizer, max_seq_length, use_crf, n_data: Optional[int] = 0):
+    def __init__(
+        self,
+        dataset: BaseSeqDataset,
+        tokenizer,
+        max_seq_length,
+        use_crf,
+        n_data: Optional[int] = 0,
+    ):
         self.id2label = deepcopy(dataset.id2label)
         self.label2id = deepcopy(dataset.label2id)
         self.n_class = len(self.id2label)
 
         if not use_crf:
-            self.dum_label = 'X'
+            self.dum_label = "X"
             self.label2id[self.dum_label] = len(self.id2label)
             self.id2label.append(self.dum_label)
 
@@ -37,7 +44,9 @@ class BERTTorchSeqDataset(Dataset):
 
         corpus = list(map(lambda x: x["text"], dataset.examples))
         self.seq_len = list(map(len, corpus))
-        input_ids_tensor, input_mask_tensor, predict_mask_tensor = self.convert_corpus_to_tensor(corpus)
+        input_ids_tensor, input_mask_tensor, predict_mask_tensor = (
+            self.convert_corpus_to_tensor(corpus)
+        )
 
         self.input_ids_tensor = input_ids_tensor
         self.input_mask_tensor = input_mask_tensor
@@ -69,7 +78,7 @@ class BERTTorchSeqDataset(Dataset):
                 if not sub_words:
                     sub_words = [self.tokenizer.unk_token]
                 if self.use_crf:
-                    ''' if crf is used, then the padded token will be ignored '''
+                    """ if crf is used, then the padded token will be ignored """
                     tokens.append(sub_words[0])
                 else:
                     tokens.extend(sub_words)
@@ -78,7 +87,7 @@ class BERTTorchSeqDataset(Dataset):
                         input_mask.append(1)
                         predict_mask.append(1)
                     elif not self.use_crf:  # These padding will hurt performance
-                        ''' '##xxx' -> 'X' (see bert paper, for non-crf model only) '''
+                        """ '##xxx' -> 'X' (see bert paper, for non-crf model only) """
                         input_mask.append(1)
                         predict_mask.append(0)
 
@@ -93,12 +102,16 @@ class BERTTorchSeqDataset(Dataset):
         for i in range(n):
             ni = len(input_ids_list[i])
             if ni > max_seq_length:
-                logger.info(f'Example is too long, length is {ni}, truncated to {max_seq_length}!')
+                logger.info(
+                    f"Example is too long, length is {ni}, truncated to {max_seq_length}!"
+                )
                 input_ids_list[i] = input_ids_list[i][:max_seq_length]
                 input_mask_list[i] = input_mask_list[i][:max_seq_length]
                 predict_mask_list[i] = predict_mask_list[i][:max_seq_length]
             else:
-                input_ids_list[i].extend([self.tokenizer.pad_token_id] * (max_seq_length - ni))
+                input_ids_list[i].extend(
+                    [self.tokenizer.pad_token_id] * (max_seq_length - ni)
+                )
                 input_mask_list[i].extend([0] * (max_seq_length - ni))
                 predict_mask_list[i].extend([0] * (max_seq_length - ni))
 
@@ -109,7 +122,7 @@ class BERTTorchSeqDataset(Dataset):
         return input_ids_tensor, input_mask_tensor, predict_mask_tensor
 
     def prepare_labels(self, labels):
-        O_id = self.label2id['O']
+        O_id = self.label2id["O"]
         if self.use_crf:
             n, max_seq_len = self.predict_mask_tensor.shape
             prepared_labels = np.ones((n, max_seq_len), dtype=int) * O_id
@@ -142,81 +155,102 @@ class BERTTorchSeqDataset(Dataset):
     def __getitem__(self, idx):
         idx = idx % self.n_data_
         d = {
-            'ids'           : idx,
-            'input_ids'     : self.input_ids_tensor[idx],
-            'attention_mask': self.input_mask_tensor[idx],
-            'mask'          : self.predict_mask_tensor[idx],
+            "ids": idx,
+            "input_ids": self.input_ids_tensor[idx],
+            "attention_mask": self.input_mask_tensor[idx],
+            "mask": self.predict_mask_tensor[idx],
         }
         return d
 
 
 class BERTTaggerModel(BaseTorchSeqModel):
-    def __init__(self,
-                 model_name: Optional[str] = 'bert-base-uncased',
-                 lr: Optional[float] = 2e-5,
-                 l2: Optional[float] = 1e-6,
-                 max_tokens: Optional[int] = 512,
-                 batch_size: Optional[int] = 32,
-                 real_batch_size: Optional[int] = 32,
-                 test_batch_size: Optional[int] = 128,
-                 n_steps: Optional[int] = 10000,
-                 use_crf: Optional[bool] = False,
-                 fine_tune_layers: Optional[int] = -1,
-                 lr_crf: Optional[float] = 5e-5,
-                 l2_crf: Optional[float] = 1e-8,
-                 ):
+    def __init__(
+        self,
+        model_name: Optional[str] = "bert-base-uncased",
+        lr: Optional[float] = 2e-5,
+        l2: Optional[float] = 1e-6,
+        max_tokens: Optional[int] = 512,
+        batch_size: Optional[int] = 32,
+        real_batch_size: Optional[int] = 32,
+        test_batch_size: Optional[int] = 128,
+        n_steps: Optional[int] = 10000,
+        use_crf: Optional[bool] = False,
+        fine_tune_layers: Optional[int] = -1,
+        lr_crf: Optional[float] = 5e-5,
+        l2_crf: Optional[float] = 1e-8,
+    ):
         super().__init__()
         self.hyperparas = {
-            'fine_tune_layers': fine_tune_layers,
-            'model_name'      : model_name,
-            'lr'              : lr,
-            'l2'              : l2,
-            'max_tokens'      : max_tokens,
-            'batch_size'      : batch_size,
-            'real_batch_size' : real_batch_size,
-            'test_batch_size' : test_batch_size,
-            'n_steps'         : n_steps,
-            'use_crf'         : use_crf,
-            'lr_crf'          : lr_crf,
-            'l2_crf'          : l2_crf,
+            "fine_tune_layers": fine_tune_layers,
+            "model_name": model_name,
+            "lr": lr,
+            "l2": l2,
+            "max_tokens": max_tokens,
+            "batch_size": batch_size,
+            "real_batch_size": real_batch_size,
+            "test_batch_size": test_batch_size,
+            "n_steps": n_steps,
+            "use_crf": use_crf,
+            "lr_crf": lr_crf,
+            "l2_crf": l2_crf,
         }
         self.model = None
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     def _init_valid_dataloader(self, dataset_valid: BaseSeqDataset) -> DataLoader:
-        torch_dataset = BERTTorchSeqDataset(dataset_valid, self.tokenizer, 512, self.hyperparas['use_crf'])
-        valid_dataloader = DataLoader(torch_dataset, batch_size=self.hyperparas['test_batch_size'], shuffle=False,
-                                      collate_fn=collate_fn)
+        torch_dataset = BERTTorchSeqDataset(
+            dataset_valid, self.tokenizer, 512, self.hyperparas["use_crf"]
+        )
+        valid_dataloader = DataLoader(
+            torch_dataset,
+            batch_size=self.hyperparas["test_batch_size"],
+            shuffle=False,
+            collate_fn=collate_fn,
+        )
         return valid_dataloader
 
-    def fit(self,
-            dataset_train: BaseSeqDataset,
-            y_train: Optional[List[List]] = None,
-            dataset_valid: Optional[BaseSeqDataset] = None,
-            y_valid: Optional[List[List]] = None,
-            evaluation_step: Optional[int] = 50,
-            metric: Optional[Union[str, Callable]] = 'f1_seq',
-            strict: Optional[bool] = True,
-            direction: Optional[str] = 'auto',
-            patience: Optional[int] = 20,
-            tolerance: Optional[float] = -1.0,
-            device: Optional[torch.device] = None,
-            verbose: Optional[bool] = True,
-            **kwargs: Any):
-
+    def fit(
+        self,
+        dataset_train: BaseSeqDataset,
+        y_train: Optional[List[List]] = None,
+        dataset_valid: Optional[BaseSeqDataset] = None,
+        y_valid: Optional[List[List]] = None,
+        evaluation_step: Optional[int] = 50,
+        metric: Optional[Union[str, Callable]] = "f1_seq",
+        strict: Optional[bool] = True,
+        direction: Optional[str] = "auto",
+        patience: Optional[int] = 20,
+        tolerance: Optional[float] = -1.0,
+        device: Optional[torch.device] = None,
+        verbose: Optional[bool] = True,
+        **kwargs: Any,
+    ):
         if not verbose:
             logger.setLevel(logging.ERROR)
 
         self._update_hyperparas(**kwargs)
         hyperparas = self.hyperparas
-        if hyperparas['real_batch_size'] == -1 or hyperparas['batch_size'] < hyperparas['real_batch_size']:
-            hyperparas['real_batch_size'] = hyperparas['batch_size']
-        accum_steps = hyperparas['batch_size'] // hyperparas['real_batch_size']
+        if (
+            hyperparas["real_batch_size"] == -1
+            or hyperparas["batch_size"] < hyperparas["real_batch_size"]
+        ):
+            hyperparas["real_batch_size"] = hyperparas["batch_size"]
+        accum_steps = hyperparas["batch_size"] // hyperparas["real_batch_size"]
 
-        n_steps = hyperparas['n_steps']
-        torch_dataset = BERTTorchSeqDataset(dataset_train, self.tokenizer, self.hyperparas['max_tokens'],
-                                            self.hyperparas['use_crf'], n_data=n_steps * hyperparas['batch_size'])
-        train_dataloader = DataLoader(torch_dataset, batch_size=hyperparas['real_batch_size'], shuffle=True, collate_fn=collate_fn)
+        n_steps = hyperparas["n_steps"]
+        torch_dataset = BERTTorchSeqDataset(
+            dataset_train,
+            self.tokenizer,
+            self.hyperparas["max_tokens"],
+            self.hyperparas["use_crf"],
+            n_data=n_steps * hyperparas["batch_size"],
+        )
+        train_dataloader = DataLoader(
+            torch_dataset,
+            batch_size=hyperparas["real_batch_size"],
+            shuffle=True,
+            collate_fn=collate_fn,
+        )
 
         if y_train is None:
             y_train = dataset_train.labels
@@ -227,31 +261,51 @@ class BERTTaggerModel(BaseTorchSeqModel):
         self.model = model
 
         param_optimizer = list(model.named_parameters())
-        crf_param = ['crf.transitions', ]
+        crf_param = [
+            "crf.transitions",
+        ]
         optimizer_grouped_parameters = [
-            {'params': [p for n, p in param_optimizer if n not in crf_param]},
-            {'params'      : [p for n, p in param_optimizer if n in crf_param], 'lr': hyperparas['lr_crf'],
-             'weight_decay': hyperparas['l2_crf']},
+            {"params": [p for n, p in param_optimizer if n not in crf_param]},
+            {
+                "params": [p for n, p in param_optimizer if n in crf_param],
+                "lr": hyperparas["lr_crf"],
+                "weight_decay": hyperparas["l2_crf"],
+            },
         ]
 
-        optimizer = AdamW(optimizer_grouped_parameters, lr=hyperparas['lr'], weight_decay=hyperparas['l2'])
+        optimizer = AdamW(
+            optimizer_grouped_parameters,
+            lr=hyperparas["lr"],
+            weight_decay=hyperparas["l2"],
+        )
 
         # Set up the learning rate scheduler
-        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=n_steps)
+        scheduler = get_linear_schedule_with_warmup(
+            optimizer, num_warmup_steps=0, num_training_steps=n_steps
+        )
 
-        valid_flag = self._init_valid_step(dataset_valid, y_valid, metric, strict, direction, patience, tolerance)
+        valid_flag = self._init_valid_step(
+            dataset_valid, y_valid, metric, strict, direction, patience, tolerance
+        )
 
         history = {}
         last_step_log = {}
         try:
-            with trange(n_steps, desc=f"[FINETUNE] {hyperparas['model_name']} Tagger", unit="steps", disable=not verbose, ncols=150, position=0, leave=True) as pbar:
+            with trange(
+                n_steps,
+                desc=f"[FINETUNE] {hyperparas['model_name']} Tagger",
+                unit="steps",
+                disable=not verbose,
+                ncols=150,
+                position=0,
+                leave=True,
+            ) as pbar:
                 cnt = 0
                 step = 0
                 model.train()
                 optimizer.zero_grad()
                 for batch in train_dataloader:
-
-                    batch_idx = batch['ids'].to(device)
+                    batch_idx = batch["ids"].to(device)
                     batch_label = y_train[batch_idx]
                     loss = model.calculate_loss(batch, batch_label)
                     loss.backward()
@@ -272,14 +326,14 @@ class BERTTaggerModel(BaseTorchSeqModel):
                                 break
 
                             history[step] = {
-                                'loss'              : loss.item(),
-                                f'val_{metric}'     : metric_value,
-                                f'best_val_{metric}': self.best_metric_value,
-                                'best_step'         : self.best_step,
+                                "loss": loss.item(),
+                                f"val_{metric}": metric_value,
+                                f"best_val_{metric}": self.best_metric_value,
+                                "best_step": self.best_step,
                             }
                             last_step_log.update(history[step])
 
-                        last_step_log['loss'] = loss.item()
+                        last_step_log["loss"] = loss.item()
                         pbar.update()
                         pbar.set_postfix(ordered_dict=last_step_log)
 
@@ -287,7 +341,9 @@ class BERTTaggerModel(BaseTorchSeqModel):
                             break
 
         except KeyboardInterrupt:
-            logger.info(f'KeyboardInterrupt! do not terminate the process in case need to save the best model')
+            logger.info(
+                "KeyboardInterrupt! do not terminate the process in case need to save the best model"
+            )
 
         self._finalize()
 

@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch import Tensor
 from typing import Optional
 
-'''
+"""
 Pytorch implementation of Dice Loss
    Reference: "Dice Loss for Data-imbalanced NLP Tasks" 
    Authors: Xiaoya Li and
@@ -14,7 +14,7 @@ Pytorch implementation of Dice Loss
             Fei Wu and
             Jiwei Li
    https://aclanthology.org/2020.acl-main.45.pdf, ACL'2020.
-'''
+"""
 
 
 class DiceLoss(nn.Module):
@@ -50,14 +50,16 @@ class DiceLoss(nn.Module):
         >>> output.backward()
     """
 
-    def __init__(self,
-                 smooth: Optional[float] = 1e-4,
-                 square_denominator: Optional[bool] = False,
-                 with_logits: Optional[bool] = True,
-                 ohem_ratio: float = 0.0,
-                 alpha: float = 0.0,
-                 reduction: Optional[str] = "mean",
-                 index_label_position=True) -> None:
+    def __init__(
+        self,
+        smooth: Optional[float] = 1e-4,
+        square_denominator: Optional[bool] = False,
+        with_logits: Optional[bool] = True,
+        ohem_ratio: float = 0.0,
+        alpha: float = 0.0,
+        reduction: Optional[str] = "mean",
+        index_label_position=True,
+    ) -> None:
         super(DiceLoss, self).__init__()
 
         self.reduction = reduction
@@ -68,7 +70,9 @@ class DiceLoss(nn.Module):
         self.alpha = alpha
         self.index_label_position = index_label_position
 
-    def forward(self, input: Tensor, target: Tensor, mask: Optional[Tensor] = None) -> Tensor:
+    def forward(
+        self, input: Tensor, target: Tensor, mask: Optional[Tensor] = None
+    ) -> Tensor:
         logits_size = input.shape[-1]
 
         if logits_size != 1:
@@ -86,20 +90,37 @@ class DiceLoss(nn.Module):
         flat_input = ((1 - flat_input) ** self.alpha) * flat_input
         interection = torch.sum(flat_input * flat_target, -1)
         if not self.square_denominator:
-            loss = 1 - ((2 * interection + self.smooth) /
-                        (flat_input.sum() + flat_target.sum() + self.smooth))
+            loss = 1 - (
+                (2 * interection + self.smooth)
+                / (flat_input.sum() + flat_target.sum() + self.smooth)
+            )
         else:
-            loss = 1 - ((2 * interection + self.smooth) /
-                        (torch.sum(torch.square(flat_input, ), -1) +
-                         torch.sum(torch.square(flat_target), -1) + self.smooth))
+            loss = 1 - (
+                (2 * interection + self.smooth)
+                / (
+                    torch.sum(
+                        torch.square(
+                            flat_input,
+                        ),
+                        -1,
+                    )
+                    + torch.sum(torch.square(flat_target), -1)
+                    + self.smooth
+                )
+            )
 
         return loss
 
     def _multiple_class(self, input, target, logits_size, mask=None):
         flat_input = input
-        flat_target = F.one_hot(target.long(),
-                                num_classes=logits_size).float() if self.index_label_position else target.float()
-        flat_input = torch.nn.Softmax(dim=1)(flat_input) if self.with_logits else flat_input
+        flat_target = (
+            F.one_hot(target.long(), num_classes=logits_size).float()
+            if self.index_label_position
+            else target.float()
+        )
+        flat_input = (
+            torch.nn.Softmax(dim=1)(flat_input) if self.with_logits else flat_input
+        )
 
         if mask is not None:
             mask = mask.float()
@@ -117,15 +138,23 @@ class DiceLoss(nn.Module):
 
                 pos_num = pos_example.sum()
                 neg_num = mask.sum() - (pos_num - (mask_neg & pos_example).sum())
-                keep_num = min(int(pos_num * self.ohem_ratio / logits_size), int(neg_num))
+                keep_num = min(
+                    int(pos_num * self.ohem_ratio / logits_size), int(neg_num)
+                )
 
                 if keep_num > 0:
-                    neg_scores = torch.masked_select(flat_input, neg_example.view(-1, 1).bool()).view(-1, logits_size)
+                    neg_scores = torch.masked_select(
+                        flat_input, neg_example.view(-1, 1).bool()
+                    ).view(-1, logits_size)
                     neg_scores_idx = neg_scores[:, label_idx]
-                    neg_scores_sort, _ = torch.sort(neg_scores_idx, )
+                    neg_scores_sort, _ = torch.sort(
+                        neg_scores_idx,
+                    )
                     threshold = neg_scores_sort[-keep_num + 1]
-                    cond = ((torch.argmax(flat_input, dim=1) == label_idx) &
-                            (flat_input[:, label_idx] >= threshold)) | pos_example.view(-1)
+                    cond = (
+                        (torch.argmax(flat_input, dim=1) == label_idx)
+                        & (flat_input[:, label_idx] >= threshold)
+                    ) | pos_example.view(-1)
                     ohem_mask_idx = torch.where(cond, 1, 0)
 
                     flat_input_idx = flat_input[:, label_idx]
@@ -137,7 +166,9 @@ class DiceLoss(nn.Module):
                     flat_input_idx = flat_input[:, label_idx]
                     flat_target_idx = flat_target[:, label_idx]
 
-                loss_idx = self._compute_dice_loss(flat_input_idx.view(-1, 1), flat_target_idx.view(-1, 1))
+                loss_idx = self._compute_dice_loss(
+                    flat_input_idx.view(-1, 1), flat_target_idx.view(-1, 1)
+                )
                 if loss is None:
                     loss = loss_idx
                 else:
@@ -150,7 +181,9 @@ class DiceLoss(nn.Module):
                 flat_input_idx = flat_input[:, label_idx]
                 flat_target_idx = flat_target[:, label_idx]
 
-                loss_idx = self._compute_dice_loss(flat_input_idx.view(-1, 1), flat_target_idx.view(-1, 1))
+                loss_idx = self._compute_dice_loss(
+                    flat_input_idx.view(-1, 1), flat_target_idx.view(-1, 1)
+                )
                 if loss is None:
                     loss = loss_idx
                 else:
@@ -179,7 +212,9 @@ class DiceLoss(nn.Module):
             keep_num = min(int(pos_num * self.ohem_ratio), neg_num)
 
             neg_scores = torch.masked_select(flat_input, neg_example.bool())
-            neg_scores_sort, _ = torch.sort(neg_scores, )
+            neg_scores_sort, _ = torch.sort(
+                neg_scores,
+            )
             threshold = neg_scores_sort[-keep_num + 1]
             cond = (flat_input > threshold) | pos_example.view(-1)
             ohem_mask = torch.where(cond, 1, 0)

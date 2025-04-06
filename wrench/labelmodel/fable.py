@@ -12,9 +12,14 @@ from wrench.dataset import BaseDataset
 
 def create_tuples(dataset: Union[BaseDataset, np.ndarray]):
     ids = np.repeat(np.array(range(len(dataset))), len(dataset.weak_labels[0]))
-    workers = np.repeat(
-        np.array([i for i in range(len(dataset.weak_labels[0]))]), len(dataset.weak_labels)
-    ).reshape(len(dataset.weak_labels[0]), -1).T.reshape(-1)
+    workers = (
+        np.repeat(
+            np.array([i for i in range(len(dataset.weak_labels[0]))]),
+            len(dataset.weak_labels),
+        )
+        .reshape(len(dataset.weak_labels[0]), -1)
+        .T.reshape(-1)
+    )
     classes = np.array(dataset.weak_labels).reshape(-1)
     tuples = np.vstack((ids, workers, classes)).astype(np.int32)
 
@@ -28,15 +33,15 @@ def scale(data):
 
 
 def lanczos_tridiag(
-        matmul_closure,
-        max_iter,
-        dtype,
-        device,
-        matrix_shape,
-        batch_shape=torch.Size(),
-        init_vecs=None,
-        num_init_vecs=1,
-        tol=1e-5,
+    matmul_closure,
+    max_iter,
+    dtype,
+    device,
+    matrix_shape,
+    batch_shape=torch.Size(),
+    init_vecs=None,
+    num_init_vecs=1,
+    tol=1e-5,
 ):
     # Determine batch mode
     multiple_init_vecs = False
@@ -49,7 +54,9 @@ def lanczos_tridiag(
 
     # Get initial probe ectors - and define if not available
     if init_vecs is None:
-        init_vecs = torch.randn(matrix_shape[-1], num_init_vecs, dtype=dtype, device=device)
+        init_vecs = torch.randn(
+            matrix_shape[-1], num_init_vecs, dtype=dtype, device=device
+        )
         init_vecs = init_vecs.expand(*batch_shape, matrix_shape[-1], num_init_vecs)
 
     else:
@@ -63,12 +70,23 @@ def lanczos_tridiag(
     # q_mat - batch version of Q - orthogonal matrix of decomp
     # alpha - batch version main diagonal of T
     # beta - batch version of off diagonal of T
-    q_mat = torch.zeros(num_iter, *batch_shape, matrix_shape[-1], num_init_vecs, dtype=dtype, device=device)
-    t_mat = torch.zeros(num_iter, num_iter, *batch_shape, num_init_vecs, dtype=dtype, device=device)
+    q_mat = torch.zeros(
+        num_iter,
+        *batch_shape,
+        matrix_shape[-1],
+        num_init_vecs,
+        dtype=dtype,
+        device=device,
+    )
+    t_mat = torch.zeros(
+        num_iter, num_iter, *batch_shape, num_init_vecs, dtype=dtype, device=device
+    )
 
     # Begin algorithm
     # Initial Q vector: q_0_vec
-    q_0_vec = init_vecs / torch.norm(init_vecs, 2, dim=dim_dimension).unsqueeze(dim_dimension)
+    q_0_vec = init_vecs / torch.norm(init_vecs, 2, dim=dim_dimension).unsqueeze(
+        dim_dimension
+    )
     q_mat[0].copy_(q_0_vec)
 
     # Initial alpha value: alpha_0
@@ -105,7 +123,9 @@ def lanczos_tridiag(
             # Compute next residual value
             r_vec.sub_(alpha_curr.mul(q_curr_vec))
             # Full reorthogonalization: r <- r - Q (Q^T r)
-            correction = r_vec.unsqueeze(0).mul(q_mat[: k + 1]).sum(dim_dimension, keepdim=True)
+            correction = (
+                r_vec.unsqueeze(0).mul(q_mat[: k + 1]).sum(dim_dimension, keepdim=True)
+            )
             correction = q_mat[: k + 1].mul(correction).sum(0)
             r_vec.sub_(correction)
             r_vec_norm = torch.norm(r_vec, 2, dim=dim_dimension, keepdim=True)
@@ -124,12 +144,18 @@ def lanczos_tridiag(
                 if not torch.sum(inner_products > tol):
                     could_reorthogonalize = True
                     break
-                correction = r_vec.unsqueeze(0).mul(q_mat[: k + 1]).sum(dim_dimension, keepdim=True)
+                correction = (
+                    r_vec.unsqueeze(0)
+                    .mul(q_mat[: k + 1])
+                    .sum(dim_dimension, keepdim=True)
+                )
                 correction = q_mat[: k + 1].mul(correction).sum(0)
                 r_vec.sub_(correction)
                 r_vec_norm = torch.norm(r_vec, 2, dim=dim_dimension, keepdim=True)
                 r_vec.div_(r_vec_norm)
-                inner_products = q_mat[: k + 1].mul(r_vec.unsqueeze(0)).sum(dim_dimension)
+                inner_products = (
+                    q_mat[: k + 1].mul(r_vec.unsqueeze(0)).sum(dim_dimension)
+                )
 
             # Update q_mat with new q value
             q_mat[k + 1].copy_(r_vec)
@@ -141,9 +167,17 @@ def lanczos_tridiag(
     num_iter = k + 1
 
     # num_init_vecs x batch_shape x matrix_shape[-1] x num_iter
-    q_mat = q_mat[:num_iter].permute(-1, *range(1, 1 + len(batch_shape)), -2, 0).contiguous()
+    q_mat = (
+        q_mat[:num_iter]
+        .permute(-1, *range(1, 1 + len(batch_shape)), -2, 0)
+        .contiguous()
+    )
     # num_init_vecs x batch_shape x num_iter x num_iter
-    t_mat = t_mat[:num_iter, :num_iter].permute(-1, *range(2, 2 + len(batch_shape)), 0, 1).contiguous()
+    t_mat = (
+        t_mat[:num_iter, :num_iter]
+        .permute(-1, *range(2, 2 + len(batch_shape)), 0, 1)
+        .contiguous()
+    )
 
     # If we weren't in batch mode, remove batch dimension
     if not multiple_init_vecs:
@@ -154,22 +188,24 @@ def lanczos_tridiag(
     return q_mat, t_mat
 
 
-def fable_vb(tuples,
-             X,  # (num_items, num_features)
-             device=None,
-             kernel_function=None,
-             num_groups=10,  # M
-             alpha=1,  # alpha_k, it can be 1 or \sum_i gamma_ik depended on empirical_prior
-             a_v=4,  # beta_kk
-             b_v=1,  # beta_kk', k neq k'
-             nu_k_learned=None,
-             mu_jkml_learned=None,
-             eval=False,
-             seed=1234,
-             inference_iter=500,
-             desired_rank=128,
-             empirical_prior=False,
-             disable_tqdm=False, ):
+def fable_vb(
+    tuples,
+    X,  # (num_items, num_features)
+    device=None,
+    kernel_function=None,
+    num_groups=10,  # M
+    alpha=1,  # alpha_k, it can be 1 or \sum_i gamma_ik depended on empirical_prior
+    a_v=4,  # beta_kk
+    b_v=1,  # beta_kk', k neq k'
+    nu_k_learned=None,
+    mu_jkml_learned=None,
+    eval=False,
+    seed=1234,
+    inference_iter=500,
+    desired_rank=128,
+    empirical_prior=False,
+    disable_tqdm=False,
+):
     torch.cuda.empty_cache()
     num_items, num_workers, num_classes = tuples.max(axis=0) + 1
 
@@ -184,10 +220,12 @@ def fable_vb(tuples,
     y_is_one_lij = []
     y_is_one_lji = []
     for k in list(range(num_classes)) + [-1]:
-        selected = (tuples[:, 2] == k)
-        coo_ij = ssp.coo_matrix((torch.ones(selected.sum()), tuples[selected, :2].T),
-                                shape=(num_items, num_workers),
-                                dtype=np.bool)
+        selected = tuples[:, 2] == k
+        coo_ij = ssp.coo_matrix(
+            (torch.ones(selected.sum()), tuples[selected, :2].T),
+            shape=(num_items, num_workers),
+            dtype=np.bool,
+        )
         y_is_one_lij.append(coo_ij.tocsr())
         y_is_one_lji.append(coo_ij.T.tocsr())
 
@@ -235,13 +273,18 @@ def fable_vb(tuples,
     # ################################
     # q(Z): z_ik (prediction)
     # ============================== Inference =====================================
-    zg_ikm = torch.tensor(np.random.dirichlet(np.ones(num_groups), z_ik.shape)) * z_ik[:, :, None]
-    for it in trange(0, inference_iter, unit='iter', disable=disable_tqdm):
-
+    zg_ikm = (
+        torch.tensor(np.random.dirichlet(np.ones(num_groups), z_ik.shape))
+        * z_ik[:, :, None]
+    )
+    for it in trange(0, inference_iter, unit="iter", disable=disable_tqdm):
         if eval is False:
             # update rules for q(Tau)
             nu_k = alpha + z_ik.sum(dim=0)
-            mu_jkml = torch.zeros((num_workers, num_classes, num_groups, num_classes + 1)) + beta_mu_kl[None, :, None, :]
+            mu_jkml = (
+                torch.zeros((num_workers, num_classes, num_groups, num_classes + 1))
+                + beta_mu_kl[None, :, None, :]
+            )
             # update rules for q(V)
             for l in list(range(num_classes)) + [-1]:
                 for k in range(num_classes):
@@ -261,7 +304,9 @@ def fable_vb(tuples,
         ga_ik = torch.zeros((num_items, num_classes * num_groups))
         f_ik = torch.zeros((num_items, num_classes * num_groups))
         for k in range(num_classes * num_groups):
-            f_ik[:, k] = torch.sqrt(torch.abs(torch.pow(m_hat[:, k], 2) + torch.diag(sigma_hat[k])))
+            f_ik[:, k] = torch.sqrt(
+                torch.abs(torch.pow(m_hat[:, k], 2) + torch.diag(sigma_hat[k]))
+            )
             f_ik[:, k] = f_ik[:, k].clamp(max=1e2)  # prevent overflow
             tem_exp = -0.5 * m_hat[:, k]
             tem_exp = tem_exp.clamp(max=1e2)  # prevent overflow
@@ -274,32 +319,40 @@ def fable_vb(tuples,
         b_ga_ikm = math.log(2.0) - m_hat / 2.0
 
         # update rules for m_hat and sigma_hat
-        divide_ab = a_ga_ikm.reshape((num_items, num_classes * num_groups)) / b_ga_ikm.reshape(
-            (num_items, num_classes * num_groups))
+        divide_ab = a_ga_ikm.reshape(
+            (num_items, num_classes * num_groups)
+        ) / b_ga_ikm.reshape((num_items, num_classes * num_groups))
         divide_ab = divide_ab.to(device, non_blocking=True, dtype=torch.float64)
         ga_ik = ga_ik.to(device, non_blocking=True, dtype=torch.float64)
         c_ik = c_ik.to(device, non_blocking=True)
-        diag = ((divide_ab + ga_ik) / (2 * c_ik) * torch.tanh(c_ik * 0.5))
+        diag = (divide_ab + ga_ik) / (2 * c_ik) * torch.tanh(c_ik * 0.5)
         for k in range(num_classes * num_groups):
             if desired_rank == None:
-                sigma_hat_tmp = torch.linalg.inv(sigma_inv + torch.diag(diag[:, k]))  # non-singular
+                sigma_hat_tmp = torch.linalg.inv(
+                    sigma_inv + torch.diag(diag[:, k])
+                )  # non-singular
             else:
                 sigma_inv_hat = sigma_inv + torch.diag(diag[:, k])
-                q_mat, t_mat = lanczos_tridiag(sigma_inv_hat.matmul,
-                                               max_iter=desired_rank,
-                                               dtype=sigma_inv_hat.dtype,
-                                               device=device,
-                                               matrix_shape=sigma_inv.shape)
+                q_mat, t_mat = lanczos_tridiag(
+                    sigma_inv_hat.matmul,
+                    max_iter=desired_rank,
+                    dtype=sigma_inv_hat.dtype,
+                    device=device,
+                    matrix_shape=sigma_inv.shape,
+                )
                 sigma_hat_tmp = q_mat @ torch.linalg.inv(t_mat) @ q_mat.T  # Lanczos
                 sigma_hat_tmp = sigma_hat_tmp.double()
 
-            m_hat[:, k] = (0.5 * sigma_hat_tmp.to(device) @ (divide_ab[:, k] - ga_ik[:, k])).to('cpu')
-            sigma_hat[k] = sigma_hat_tmp.to('cpu')  # save gpu memory
+            m_hat[:, k] = (
+                0.5 * sigma_hat_tmp.to(device) @ (divide_ab[:, k] - ga_ik[:, k])
+            ).to("cpu")
+            sigma_hat[k] = sigma_hat_tmp.to("cpu")  # save gpu memory
             del sigma_hat_tmp  # save gpu memory
 
         # q(G, Z)
-        Eq_log_pi_ikm = digamma(a_ga_ikm.reshape(num_items, num_classes, num_groups)) - torch.log(
-            b_ga_ikm.reshape(num_items, num_classes, num_groups))
+        Eq_log_pi_ikm = digamma(
+            a_ga_ikm.reshape(num_items, num_classes, num_groups)
+        ) - torch.log(b_ga_ikm.reshape(num_items, num_classes, num_groups))
         Eq_log_tau_k = digamma(nu_k) - digamma(nu_k.sum())
         Eq_log_v_jkml = digamma(mu_jkml) - digamma(mu_jkml.sum(dim=-1, keepdim=True))
 
@@ -307,15 +360,19 @@ def fable_vb(tuples,
         for l in list(range(num_classes)) + [-1]:
             for k in range(num_classes):
                 if l == -1:
-                    zg_ikm[:, k, :] += y_is_one_lij[l].dot(Eq_log_v_jkml[:, k, :, num_classes].numpy())
+                    zg_ikm[:, k, :] += y_is_one_lij[l].dot(
+                        Eq_log_v_jkml[:, k, :, num_classes].numpy()
+                    )
                 else:
-                    zg_ikm[:, k, :] += y_is_one_lij[l].dot(Eq_log_v_jkml[:, k, :, l].numpy())
+                    zg_ikm[:, k, :] += y_is_one_lij[l].dot(
+                        Eq_log_v_jkml[:, k, :, l].numpy()
+                    )
 
         # update rules for q(Z)
         zg_ikm = torch.exp(zg_ikm)
         zg_ikm /= zg_ikm.reshape(num_items, -1).sum(dim=-1)[:, None, None]
         if torch.isnan(zg_ikm).any():
-            print('stop')
+            print("stop")
             break
 
         last_z_ik = z_ik
@@ -324,7 +381,7 @@ def fable_vb(tuples,
         z_ik = zg_ikm.sum(dim=-1)
 
         if torch.allclose(last_z_ik, z_ik, atol=1e-2):
-            print(f'gp-ebcc: convergent at step {it}')
+            print(f"gp-ebcc: convergent at step {it}")
             break
 
     return z_ik.cpu().numpy(), nu_k.cpu().numpy(), mu_jkml.cpu().numpy()
@@ -333,82 +390,82 @@ def fable_vb(tuples,
 class Fable(BaseLabelModel):
     """Fable
 
-        Usage:
+    Usage:
 
-            fable = FABLE(num_groups, a_pi, a_v, b_v, inference_iter, empirical_prior, kernel_function, desired_rank)
-            fable.fit(data)
-            fable.test(data)
+        fable = FABLE(num_groups, a_pi, a_v, b_v, inference_iter, empirical_prior, kernel_function, desired_rank)
+        fable.fit(data)
+        fable.test(data)
 
-        Parameters:
+    Parameters:
 
-            num_groups: number of subtypes
-            a_pi: The parameter of dirichlet distribution for generate mixture weight.
-            a_v: b_kk, number of corrected labeled items under every class.
-            b_v: b_kk', all kind of miss has made b_kk' times.
-            inference_iter: Iterations of variational inference.
-            empirical_prior: The empirical prior of alpha.
-            kernel_function: The kernel function of Gaussian process.
-            desired_rank: Param for reduced rank approximation (Lanczos), which reduce the rank of matrix to desired_rank.
-            device: The torch.device to use.
-            seed: Random seed.
+        num_groups: number of subtypes
+        a_pi: The parameter of dirichlet distribution for generate mixture weight.
+        a_v: b_kk, number of corrected labeled items under every class.
+        b_v: b_kk', all kind of miss has made b_kk' times.
+        inference_iter: Iterations of variational inference.
+        empirical_prior: The empirical prior of alpha.
+        kernel_function: The kernel function of Gaussian process.
+        desired_rank: Param for reduced rank approximation (Lanczos), which reduce the rank of matrix to desired_rank.
+        device: The torch.device to use.
+        seed: Random seed.
     """
 
-    def __init__(self,
-                 kernel_function,
-                 num_groups: Optional[int] = 10,
-                 alpha: Optional[float] = 1,
-                 a_v: Optional[float] = 4,
-                 b_v: Optional[float] = 1,
-                 inference_iter: Optional[int] = 1000,
-                 seed: Optional[int] = None,
-                 empirical_prior=False,
-                 device: Optional[torch.device] = None,
-                 **kwargs: Any):
+    def __init__(
+        self,
+        kernel_function,
+        num_groups: Optional[int] = 10,
+        alpha: Optional[float] = 1,
+        a_v: Optional[float] = 4,
+        b_v: Optional[float] = 1,
+        inference_iter: Optional[int] = 1000,
+        seed: Optional[int] = None,
+        empirical_prior=False,
+        device: Optional[torch.device] = None,
+        **kwargs: Any,
+    ):
         super().__init__()
         self.hyperparas = {
-            'seed': np.random.randint(1e8) if seed is None else seed,
-            'kernel_function': kernel_function,
-            'num_groups': num_groups,
-            'alpha': alpha,
-            'a_v': a_v,
-            'b_v': b_v,
-            'empirical_prior': empirical_prior,
-            'inference_iter': inference_iter,
-            **kwargs
+            "seed": np.random.randint(1e8) if seed is None else seed,
+            "kernel_function": kernel_function,
+            "num_groups": num_groups,
+            "alpha": alpha,
+            "a_v": a_v,
+            "b_v": b_v,
+            "empirical_prior": empirical_prior,
+            "inference_iter": inference_iter,
+            **kwargs,
         }
-        self.params = {
-            'nu_k_learned': None,
-            'mu_jkml_learned': None
-        }
+        self.params = {"nu_k_learned": None, "mu_jkml_learned": None}
         self.device = device
 
-    def fit(self,
-            dataset_train: Union[BaseDataset, np.ndarray],
-            dataset_valid: Optional[Union[BaseDataset, np.ndarray]] = None,
-            y_valid: Optional[np.ndarray] = None,
-            n_class: Optional[int] = None,
-            verbose: Optional[bool] = False,
-            *args: Any,
-            **kwargs: Any):
+    def fit(
+        self,
+        dataset_train: Union[BaseDataset, np.ndarray],
+        dataset_valid: Optional[Union[BaseDataset, np.ndarray]] = None,
+        y_valid: Optional[np.ndarray] = None,
+        n_class: Optional[int] = None,
+        verbose: Optional[bool] = False,
+        *args: Any,
+        **kwargs: Any,
+    ):
         train_tuples = create_tuples(dataset_train)
         inputs = np.array(dataset_train.features)
         nan_index = np.unique(np.argwhere(np.isnan(inputs))[:, 0])
         inputs[nan_index] = np.zeros(inputs.shape[1])
-        print(f'NaN values included: {nan_index.tolist()}')
+        print(f"NaN values included: {nan_index.tolist()}")
 
-        pred, nu_k, mu_jkml = fable_vb(train_tuples, inputs,
-                                       device=self.device,
-                                       **self.params, **self.hyperparas)
-        self.params.update({
-            'nu_k_learned': nu_k,
-            'mu_jkml_learned': mu_jkml
-        })
+        pred, nu_k, mu_jkml = fable_vb(
+            train_tuples, inputs, device=self.device, **self.params, **self.hyperparas
+        )
+        self.params.update({"nu_k_learned": nu_k, "mu_jkml_learned": mu_jkml})
         return pred
 
-    def predict_proba(self,
-                      dataset: Union[BaseDataset, np.ndarray],
-                      batch_learning: Optional[bool] = False,
-                      **kwargs: Any):
+    def predict_proba(
+        self,
+        dataset: Union[BaseDataset, np.ndarray],
+        batch_learning: Optional[bool] = False,
+        **kwargs: Any,
+    ):
         test_batch = dataset
 
         tuples = create_tuples(test_batch)
@@ -417,15 +474,22 @@ class Fable(BaseLabelModel):
         inputs[nan_index] = np.zeros(inputs.shape[1])
         eval = True
 
-        if self.params['nu_k_learned'] is None or self.params['mu_jkml_learned'] is None:
+        if (
+            self.params["nu_k_learned"] is None
+            or self.params["mu_jkml_learned"] is None
+        ):
             eval = False
 
         disable_tqdm = False
         if batch_learning:
             disable_tqdm = True
-        pred, _, _ = fable_vb(tuples, inputs,
-                              eval=eval,
-                              device=self.device,
-                              disable_tqdm=disable_tqdm,
-                              **self.hyperparas, **self.params)
+        pred, _, _ = fable_vb(
+            tuples,
+            inputs,
+            eval=eval,
+            device=self.device,
+            disable_tqdm=disable_tqdm,
+            **self.hyperparas,
+            **self.params,
+        )
         return pred

@@ -8,22 +8,26 @@ from wrench.dataset import BaseDataset
 from ..utils import create_tuples
 
 
-def ibcc(tuples,
-         num_items,
-         num_workers,
-         num_classes,
-         a_v=4,
-         b_v=1,
-         alpha=1,
-         n_jkl=None,
-         eval=False):
-
+def ibcc(
+    tuples,
+    num_items,
+    num_workers,
+    num_classes,
+    a_v=4,
+    b_v=1,
+    alpha=1,
+    n_jkl=None,
+    eval=False,
+):
     y_is_one_kij = []
     y_is_one_kji = []
     for k in range(num_classes):
-        selected = (tuples[:, 2] == k)
-        coo_ij = ssp.coo_matrix((np.ones(selected.sum()), tuples[selected, :2].T),
-                                shape=(num_items, num_workers), dtype=np.bool)
+        selected = tuples[:, 2] == k
+        coo_ij = ssp.coo_matrix(
+            (np.ones(selected.sum()), tuples[selected, :2].T),
+            shape=(num_items, num_workers),
+            dtype=np.bool,
+        )
         y_is_one_kij.append(coo_ij.tocsr())
         y_is_one_kji.append(coo_ij.T.tocsr())
 
@@ -41,14 +45,18 @@ def ibcc(tuples,
 
     for iteration in range(500):
         # E step
-        Eq_log_pi_k = digamma(z_ik.sum(axis=0) + alpha)  # - digamma(num_items + num_classes * alpha)
+        Eq_log_pi_k = digamma(
+            z_ik.sum(axis=0) + alpha
+        )  # - digamma(num_items + num_classes * alpha)
 
         if eval is False:
             for l in range(num_classes):
                 n_jkl[:, :, l] = y_is_one_kji[l].dot(z_ik)
 
-        Eq_log_v_jkl = digamma(n_jkl + prior_kl[None, :, :]) - \
-                       digamma(n_jkl.sum(axis=-1) + prior_kl.sum(axis=-1))[:, :, None]
+        Eq_log_v_jkl = (
+            digamma(n_jkl + prior_kl[None, :, :])
+            - digamma(n_jkl.sum(axis=-1) + prior_kl.sum(axis=-1))[:, :, None]
+        )
 
         # M step
         last_z_ik[:] = z_ik
@@ -66,42 +74,45 @@ def ibcc(tuples,
 
 
 class IBCC(BaseLabelModel):
-    def __init__(self,
-                 alpha: Optional[float] = 1,
-                 a_v: Optional[float] = 4,
-                 b_v: Optional[float] = 1,
-                 **kwargs: Any):
+    def __init__(
+        self,
+        alpha: Optional[float] = 1,
+        a_v: Optional[float] = 4,
+        b_v: Optional[float] = 1,
+        **kwargs: Any,
+    ):
         super().__init__()
-        self.hyperparas = {
-            'alpha': alpha,
-            'a_v': a_v,
-            'b_v': b_v,
-            **kwargs
-        }
+        self.hyperparas = {"alpha": alpha, "a_v": a_v, "b_v": b_v, **kwargs}
         self.params = {
-            'n_jkl': None,
+            "n_jkl": None,
         }
 
-    def fit(self,
-            dataset_train: Union[BaseDataset, np.ndarray],
-            dataset_valid: Optional[Union[BaseDataset, np.ndarray]] = None,
-            y_valid: Optional[np.ndarray] = None,
-            n_class: Optional[int] = None,
-            verbose: Optional[bool] = False,
-            *args: Any,
-            **kwargs: Any):
+    def fit(
+        self,
+        dataset_train: Union[BaseDataset, np.ndarray],
+        dataset_valid: Optional[Union[BaseDataset, np.ndarray]] = None,
+        y_valid: Optional[np.ndarray] = None,
+        n_class: Optional[int] = None,
+        verbose: Optional[bool] = False,
+        *args: Any,
+        **kwargs: Any,
+    ):
         tuples = create_tuples(dataset_train)
         num_items, num_workers, num_classes = tuples.max(axis=0) + 1
         _, param = ibcc(tuples, num_items, num_workers, num_classes, **self.hyperparas)
-        self.params['n_jkl'] = param
+        self.params["n_jkl"] = param
 
-    def predict_proba(self,
-                      dataset: Union[BaseDataset, np.ndarray],
-                      **kwargs: Any):
+    def predict_proba(self, dataset: Union[BaseDataset, np.ndarray], **kwargs: Any):
         tuples = create_tuples(dataset)
         num_items, _, num_classes = tuples.max(axis=0) + 1
         num_workers = len(dataset.weak_labels[0])
-        pred, _ = ibcc(tuples, num_items, num_workers, num_classes,
-                       eval=True,
-                       **self.hyperparas, **self.params)
+        pred, _ = ibcc(
+            tuples,
+            num_items,
+            num_workers,
+            num_classes,
+            eval=True,
+            **self.hyperparas,
+            **self.params,
+        )
         return pred

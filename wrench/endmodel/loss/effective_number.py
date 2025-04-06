@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import torch.nn.functional as F
 
-'''
+"""
 Pytorch implementation of Class-Balanced-Loss
    Reference: "Class-Balanced Loss Based on Effective Number of Samples" 
    Authors: Yin Cui and
@@ -11,7 +11,7 @@ Pytorch implementation of Class-Balanced-Loss
                Yang Song and
                Serge J. Belongie
    https://arxiv.org/abs/1901.05555, CVPR'19.
-'''
+"""
 
 
 def focal_loss(logits, labels, alpha, gamma):
@@ -28,12 +28,16 @@ def focal_loss(logits, labels, alpha, gamma):
     Returns:
       focal_loss: A float32 scalar representing normalized total loss.
     """
-    BCLoss = F.binary_cross_entropy_with_logits(input=logits, target=labels, reduction="none")
+    BCLoss = F.binary_cross_entropy_with_logits(
+        input=logits, target=labels, reduction="none"
+    )
 
     if gamma == 0.0:
         modulator = 1.0
     else:
-        modulator = torch.exp(-gamma * labels * logits - gamma * torch.log(1 + torch.exp(-1.0 * logits)))
+        modulator = torch.exp(
+            -gamma * labels * logits - gamma * torch.log(1 + torch.exp(-1.0 * logits))
+        )
 
     loss = modulator * BCLoss
 
@@ -44,14 +48,17 @@ def focal_loss(logits, labels, alpha, gamma):
     return focal_loss
 
 
-def CB_loss(logit,
-            labels,
-            samples_per_cls,
-            no_of_classes,
-            loss_type,
-            beta,
-            device,
-            gamma, **kwargs):
+def CB_loss(
+    logit,
+    labels,
+    samples_per_cls,
+    no_of_classes,
+    loss_type,
+    beta,
+    device,
+    gamma,
+    **kwargs,
+):
     """Compute the Class Balanced Loss between `logits` and the ground truth `labels`.
     Class Balanced Loss: ((1-beta)/(1-beta^n))*Loss(labels, logits)
     where Loss is one of the standard losses used for Neural Networks.
@@ -83,7 +90,9 @@ def CB_loss(logit,
     if loss_type == "focal":
         cb_loss = focal_loss(logit, labels_one_hot, weights, gamma)
     elif loss_type == "sigmoid":
-        cb_loss = F.binary_cross_entropy_with_logits(input=logit, target=labels_one_hot, weight=weights)
+        cb_loss = F.binary_cross_entropy_with_logits(
+            input=logit, target=labels_one_hot, weight=weights
+        )
     elif loss_type == "softmax":
         logit = logit.softmax(dim=1)
         cb_loss = F.cross_entropy(input=logit, target=labels_one_hot, weight=weights)

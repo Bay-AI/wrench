@@ -12,7 +12,6 @@ from torch.utils.data import DataLoader
 
 from transformers import AutoTokenizer
 
-from ..backbone import BackBone
 from ..basemodel import BaseTorchClassModel, BaseLabelModel
 from ..config import Config
 from ..dataset import BaseDataset
@@ -23,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 def transform_snorkel_matrix_to_z_t(
-        class_matrix: np.ndarray, col_row_dict: Dict = None
+    class_matrix: np.ndarray, col_row_dict: Dict = None
 ) -> [np.ndarray, np.ndarray, Dict]:
     """Takes a matrix in WRENCH format and transforms it to matrices Z and T which define rule matches and
     rule-to-class mappings.
@@ -46,10 +45,7 @@ def transform_snorkel_matrix_to_z_t(
             if len(col) < 1:
                 raise ValueError("Column has no matching classes")
             for elt in col:
-                col_row_dict[j] = {
-                    "original_col": i,
-                    "label": elt
-                }
+                col_row_dict[j] = {"original_col": i, "label": elt}
                 j += 1
 
     # init T matrix
@@ -71,9 +67,9 @@ def transform_snorkel_matrix_to_z_t(
 
 
 def merge_datasets(dataset_1: BaseDataset, dataset_2: BaseDataset):
-    assert (dataset_1.n_lf == dataset_2.n_lf)
-    assert (dataset_1.n_class == dataset_2.n_class)
-    assert (len(dataset_1.id2label) == len(dataset_2.id2label))
+    assert dataset_1.n_lf == dataset_2.n_lf
+    assert dataset_1.n_class == dataset_2.n_class
+    assert len(dataset_1.id2label) == len(dataset_2.id2label)
     if isinstance(dataset_1.weak_labels, np.ndarray):
         dataset_1.weak_labels = dataset_2.weak_labels.tolist()
 
@@ -88,19 +84,25 @@ def merge_datasets(dataset_1: BaseDataset, dataset_2: BaseDataset):
     return dataset_1
 
 
-def transform_to_sepll_format(train_data: BaseDataset,
-                              valid_data: Optional[BaseDataset] = None,
-                              test_data: Optional[BaseDataset] = None):
+def transform_to_sepll_format(
+    train_data: BaseDataset,
+    valid_data: Optional[BaseDataset] = None,
+    test_data: Optional[BaseDataset] = None,
+):
     train_data_new = copy.deepcopy(train_data)
     train_matrix = np.array(train_data_new.weak_labels)
 
-    train_z_matrix, t_matrix, col_row_dict = transform_snorkel_matrix_to_z_t(train_matrix)
+    train_z_matrix, t_matrix, col_row_dict = transform_snorkel_matrix_to_z_t(
+        train_matrix
+    )
     train_data_new.weak_labels = train_z_matrix
     train_data_new.t_matrix = t_matrix
 
     if valid_data is not None:
         valid_data_new = copy.deepcopy(valid_data)
-        valid_z_matrix, _, _ = transform_snorkel_matrix_to_z_t(np.array(valid_data_new.weak_labels), col_row_dict)
+        valid_z_matrix, _, _ = transform_snorkel_matrix_to_z_t(
+            np.array(valid_data_new.weak_labels), col_row_dict
+        )
         valid_data_new.weak_labels = valid_z_matrix
         valid_data_new.t_matrix = t_matrix
     else:
@@ -108,7 +110,9 @@ def transform_to_sepll_format(train_data: BaseDataset,
 
     if test_data is not None:
         test_data_new = copy.deepcopy(test_data)
-        test_z_matrix, _, _ = transform_snorkel_matrix_to_z_t(np.array(test_data_new.weak_labels), col_row_dict)
+        test_z_matrix, _, _ = transform_snorkel_matrix_to_z_t(
+            np.array(test_data_new.weak_labels), col_row_dict
+        )
         test_data_new.weak_labels = test_z_matrix
         test_data_new.t_matrix = t_matrix
     else:
@@ -118,7 +122,15 @@ def transform_to_sepll_format(train_data: BaseDataset,
 
 
 class SepLLModel(nn.Module):
-    def __init__(self, hidden_size: int, n_rules: int, n_class: int, T: torch.Tensor, dropout_proba: float, backbone):
+    def __init__(
+        self,
+        hidden_size: int,
+        n_rules: int,
+        n_class: int,
+        T: torch.Tensor,
+        dropout_proba: float,
+        backbone,
+    ):
         super(SepLLModel, self).__init__()
 
         self.n_class = n_class
@@ -146,28 +158,29 @@ class SepLLModel(nn.Module):
 
 
 class SepLL(BaseTorchClassModel):
-    def __init__(self,
-                 batch_size: Optional[int] = 16,
-                 real_batch_size: Optional[int] = 16,
-                 test_batch_size: Optional[int] = 16,
-                 n_steps: Optional[int] = 10000,
-                 grad_norm: Optional[float] = -1,
-                 use_lr_scheduler: Optional[bool] = False,
-                 binary_mode: Optional[bool] = False,
-                 add_unlabeled: Optional[bool] = False,
-                 class_noise: float = 0.0,
-                 lf_l2_regularization: float = 0.0,
-                 **kwargs: Any
-                 ):
+    def __init__(
+        self,
+        batch_size: Optional[int] = 16,
+        real_batch_size: Optional[int] = 16,
+        test_batch_size: Optional[int] = 16,
+        n_steps: Optional[int] = 10000,
+        grad_norm: Optional[float] = -1,
+        use_lr_scheduler: Optional[bool] = False,
+        binary_mode: Optional[bool] = False,
+        add_unlabeled: Optional[bool] = False,
+        class_noise: float = 0.0,
+        lf_l2_regularization: float = 0.0,
+        **kwargs: Any,
+    ):
         super().__init__()
         self.hyperparas = {
-            'batch_size': batch_size,
-            'real_batch_size': real_batch_size,
-            'test_batch_size': test_batch_size,
-            'n_steps': n_steps,
-            'grad_norm': grad_norm,
-            'use_lr_scheduler': use_lr_scheduler,
-            'binary_mode': binary_mode,
+            "batch_size": batch_size,
+            "real_batch_size": real_batch_size,
+            "test_batch_size": test_batch_size,
+            "n_steps": n_steps,
+            "grad_norm": grad_norm,
+            "use_lr_scheduler": use_lr_scheduler,
+            "binary_mode": binary_mode,
         }
         self.model: Optional[SepLLModel] = None
         self.label_model: Optional[BaseLabelModel] = None
@@ -177,32 +190,35 @@ class SepLL(BaseTorchClassModel):
             use_lr_scheduler=use_lr_scheduler,
             use_backbone=True,
             use_label_model=True,
-            **kwargs
+            **kwargs,
         )
-        self.is_bert = self.config.backbone_config['name'] == 'BERT'
+        self.is_bert = self.config.backbone_config["name"] == "BERT"
         if self.is_bert:
-            self.tokenizer = AutoTokenizer.from_pretrained(self.config.backbone_config['paras']['model_name'])
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.config.backbone_config["paras"]["model_name"]
+            )
 
         ## SepLL regularization settings:
         self.add_unlabeled = add_unlabeled
         self.class_noise = class_noise
         self.lf_l2_regularization = lf_l2_regularization
 
-    def fit(self,
-            dataset_train: BaseDataset,
-            dataset_valid: Optional[BaseDataset] = None,
-            y_valid: Optional[np.ndarray] = None,
-            cut_tied: Optional[bool] = False,
-            valid_mode: Optional[str] = 'feature',
-            evaluation_step: Optional[int] = 100,
-            metric: Optional[Union[str, Callable]] = 'acc',
-            direction: Optional[str] = 'auto',
-            patience: Optional[int] = 20,
-            tolerance: Optional[float] = -1.0,
-            device: Optional[torch.device] = None,
-            verbose: Optional[bool] = True,
-            **kwargs: Any):
-
+    def fit(
+        self,
+        dataset_train: BaseDataset,
+        dataset_valid: Optional[BaseDataset] = None,
+        y_valid: Optional[np.ndarray] = None,
+        cut_tied: Optional[bool] = False,
+        valid_mode: Optional[str] = "feature",
+        evaluation_step: Optional[int] = 100,
+        metric: Optional[Union[str, Callable]] = "acc",
+        direction: Optional[str] = "auto",
+        patience: Optional[int] = 20,
+        tolerance: Optional[float] = -1.0,
+        device: Optional[torch.device] = None,
+        verbose: Optional[bool] = True,
+        **kwargs: Any,
+    ):
         if not verbose:
             logger.setLevel(logging.ERROR)
 
@@ -210,16 +226,23 @@ class SepLL(BaseTorchClassModel):
         hyperparas = self.config.hyperparas
         logger.info(config)
 
-        n_steps = hyperparas['n_steps']
-        if hyperparas['real_batch_size'] == -1 or hyperparas['batch_size'] < hyperparas[
-            'real_batch_size'] or not self.is_bert:
-            hyperparas['real_batch_size'] = hyperparas['batch_size']
-        accum_steps = hyperparas['batch_size'] // hyperparas['real_batch_size']
+        n_steps = hyperparas["n_steps"]
+        if (
+            hyperparas["real_batch_size"] == -1
+            or hyperparas["batch_size"] < hyperparas["real_batch_size"]
+            or not self.is_bert
+        ):
+            hyperparas["real_batch_size"] = hyperparas["batch_size"]
+        accum_steps = hyperparas["batch_size"] // hyperparas["real_batch_size"]
 
         # Data Preparaction
-        dataset_train, dataset_valid, _ = transform_to_sepll_format(dataset_train, dataset_valid, test_data=None)
+        dataset_train, dataset_valid, _ = transform_to_sepll_format(
+            dataset_train, dataset_valid, test_data=None
+        )
 
-        labeled_dataset, unlabeled_dataset = split_labeled_unlabeled(dataset_train, cut_tied=cut_tied)
+        labeled_dataset, unlabeled_dataset = split_labeled_unlabeled(
+            dataset_train, cut_tied=cut_tied
+        )
         if self.add_unlabeled:
             unlabeled_dataset.weak_labels = np.ones(unlabeled_dataset.weak_labels.shape)
             labeled_dataset = merge_datasets(labeled_dataset, unlabeled_dataset)
@@ -236,11 +259,13 @@ class SepLL(BaseTorchClassModel):
             labeled_dataset.weak_labels = Z_new
 
         labeled_dataset.weak_labels = np.nan_to_num(
-            labeled_dataset.weak_labels / labeled_dataset.weak_labels.sum(axis=1, keepdims=True)
+            labeled_dataset.weak_labels
+            / labeled_dataset.weak_labels.sum(axis=1, keepdims=True)
         )
 
         dataset_valid.weak_labels = np.nan_to_num(
-            dataset_valid.weak_labels / dataset_valid.weak_labels.sum(axis=1, keepdims=True)
+            dataset_valid.weak_labels
+            / dataset_valid.weak_labels.sum(axis=1, keepdims=True)
         )
 
         # Model Preparation
@@ -253,7 +278,7 @@ class SepLL(BaseTorchClassModel):
             dataset=dataset_train,
             n_class=dataset_train.n_class,
             config=config,
-            is_bert=self.is_bert
+            is_bert=self.is_bert,
         )
         if self.is_bert:
             hidden_size = dataset_train.features.shape[1]
@@ -266,7 +291,7 @@ class SepLL(BaseTorchClassModel):
             n_class=n_class,
             T=T,
             dropout_proba=0.1,
-            backbone=backbone
+            backbone=backbone,
         )
         self.model = model.to(device)
 
@@ -296,26 +321,36 @@ class SepLL(BaseTorchClassModel):
         history = {}
         last_step_log = {}
         try:
-            with trange(n_steps, desc="[TRAIN] SepLL", unit="steps", disable=not verbose, ncols=150,
-                        position=0, leave=True) as pbar:
+            with trange(
+                n_steps,
+                desc="[TRAIN] SepLL",
+                unit="steps",
+                disable=not verbose,
+                ncols=150,
+                position=0,
+                leave=True,
+            ) as pbar:
                 cnt = 0
                 step = 0
                 model.train()
                 optimizer.zero_grad()
                 for batch in labeled_dataloader:
-
-                    z = batch['weak_labels'].to(device)
+                    z = batch["weak_labels"].to(device)
                     task_output, lf_output, lf_pred_logspace = model(batch)
                     loss = cross_entropy_with_probs(lf_pred_logspace, z)
                     if self.lf_l2_regularization > 0:
                         lf_weight = model.lf_classifier.weight
-                        loss += self.lf_l2_regularization * (lf_weight * lf_weight).sum()
+                        loss += (
+                            self.lf_l2_regularization * (lf_weight * lf_weight).sum()
+                        )
                     loss.backward()
                     cnt += 1
 
                     if cnt % accum_steps == 0:
-                        if hyperparas['grad_norm'] > 0:
-                            nn.utils.clip_grad_norm_(model.parameters(), hyperparas['grad_norm'])
+                        if hyperparas["grad_norm"] > 0:
+                            nn.utils.clip_grad_norm_(
+                                model.parameters(), hyperparas["grad_norm"]
+                            )
                         optimizer.step()
                         if scheduler is not None:
                             scheduler.step()
@@ -323,20 +358,22 @@ class SepLL(BaseTorchClassModel):
                         step += 1
 
                         if valid_flag and step % evaluation_step == 0:
-                            metric_value, early_stop_flag, info = self._valid_step(step, mode=valid_mode)
+                            metric_value, early_stop_flag, info = self._valid_step(
+                                step, mode=valid_mode
+                            )
                             if early_stop_flag:
                                 logger.info(info)
                                 break
 
                             history[step] = {
-                                'loss': loss.item(),
-                                f'val_{metric}': metric_value,
-                                f'best_val_{metric}': self.best_metric_value,
-                                'best_step': self.best_step,
+                                "loss": loss.item(),
+                                f"val_{metric}": metric_value,
+                                f"best_val_{metric}": self.best_metric_value,
+                                "best_step": self.best_step,
                             }
                             last_step_log.update(history[step])
 
-                        last_step_log['loss'] = loss.item()
+                        last_step_log["loss"] = loss.item()
                         pbar.update()
                         pbar.set_postfix(ordered_dict=last_step_log)
 
@@ -344,15 +381,21 @@ class SepLL(BaseTorchClassModel):
                             break
 
         except KeyboardInterrupt:
-            logger.info(f'KeyboardInterrupt! do not terminate the process in case need to save the best model')
+            logger.info(
+                "KeyboardInterrupt! do not terminate the process in case need to save the best model"
+            )
 
         self._finalize()
 
         return history
 
     @torch.no_grad()
-    def predict_proba(self, dataset: Union[BaseDataset, DataLoader], device: Optional[torch.device] = None,
-                      **kwargs: Any):
+    def predict_proba(
+        self,
+        dataset: Union[BaseDataset, DataLoader],
+        device: Optional[torch.device] = None,
+        **kwargs: Any,
+    ):
         if device is not None:
             model = self.model.to(device)
         else:

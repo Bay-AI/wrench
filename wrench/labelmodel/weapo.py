@@ -56,7 +56,9 @@ def get_binary_constraints(L, min_cnt=0.0, exclude_all_abstain=True):
     if len(partial_order_tree.edges) == 0:
         return g
 
-    node2descendants = {n: list(nx.descendants(partial_order_tree, n)) for n in partial_order_tree.nodes}
+    node2descendants = {
+        n: list(nx.descendants(partial_order_tree, n)) for n in partial_order_tree.nodes
+    }
     for u in partial_order_tree.nodes:
         successors = list(partial_order_tree.successors(u))
         descendants = node2descendants[u]
@@ -78,7 +80,9 @@ def process_fn(i, L_i, exclude_all_abstain=True):
     idx_l = list(range(L_i.shape[1]))
     G = set()
     for l_idx in combinations(idx_l, i):
-        g = get_binary_constraints(L_i[:, l_idx], exclude_all_abstain=exclude_all_abstain)
+        g = get_binary_constraints(
+            L_i[:, l_idx], exclude_all_abstain=exclude_all_abstain
+        )
         G.update(g)
     return G
 
@@ -134,7 +138,9 @@ def get_constraints(L, full=False):
             if len(range_m) >= 5:
                 pool = Pool(len(range_m))
                 worker = partial(process_fn, L_i=L_c)
-                for val in tqdm(pool.imap_unordered(worker, range_m), total=len(range_m)):
+                for val in tqdm(
+                    pool.imap_unordered(worker, range_m), total=len(range_m)
+                ):
                     g = val
                     G_s.update(g)
                 # pool.join()
@@ -158,13 +164,15 @@ class Weapo(BaseLabelModel):
         self.prior_cons = prior_cons
         self.w = None
 
-    def fit(self,
-            dataset_train: Union[BaseDataset, np.ndarray],
-            dataset_valid: Optional[Union[BaseDataset, np.ndarray]] = None,
-            y_valid: Optional[np.ndarray] = None,
-            balance: Optional[np.ndarray] = None,
-            verbose: Optional[bool] = True,
-            **kwargs: Any):
+    def fit(
+        self,
+        dataset_train: Union[BaseDataset, np.ndarray],
+        dataset_valid: Optional[Union[BaseDataset, np.ndarray]] = None,
+        y_valid: Optional[np.ndarray] = None,
+        balance: Optional[np.ndarray] = None,
+        verbose: Optional[bool] = True,
+        **kwargs: Any,
+    ):
         L = check_weak_labels(dataset_train)
         if balance is None:
             balance = self._init_balance(L, dataset_valid, y_valid, 2)
@@ -178,7 +186,7 @@ class Weapo(BaseLabelModel):
             if cnt > 1:
                 indices = np.where(b == i)[0]
                 equal_indices.append(indices)
-                for (v1, v2) in combinations(indices, 2):
+                for v1, v2 in combinations(indices, 2):
                     v = np.zeros(m)
                     v[v1] = 1
                     v[v2] = -1
@@ -209,10 +217,9 @@ class Weapo(BaseLabelModel):
         upper = min(1, balance[1] / cover_rate)
 
         if self.prior_cons:
-            obj = cp.Minimize(margin + cp.norm(w, 2)
-                              + cp.pos(lower - x_mean)
-                              + cp.pos(x_mean - upper)
-                              )
+            obj = cp.Minimize(
+                margin + cp.norm(w, 2) + cp.pos(lower - x_mean) + cp.pos(x_mean - upper)
+            )
         else:
             obj = cp.Minimize(margin)
 
@@ -236,10 +243,12 @@ class Weapo(BaseLabelModel):
         self.B = B
         self.components = components
 
-    def predict_proba(self, dataset: Union[BaseDataset, np.ndarray], **kwargs: Any) -> np.ndarray:
+    def predict_proba(
+        self, dataset: Union[BaseDataset, np.ndarray], **kwargs: Any
+    ) -> np.ndarray:
         L = check_weak_labels(dataset)
         proba = np.zeros((len(L), 2))
-        raw_score = (L @ self.w)
+        raw_score = L @ self.w
         max_ = max(raw_score)
         min_ = min(raw_score)
 

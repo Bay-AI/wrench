@@ -17,13 +17,15 @@ class MajorityWeightedVoting(BaseLabelModel):
         super().__init__()
         self.balance = None
 
-    def fit(self,
-            dataset_train: Union[BaseDataset, np.ndarray],
-            dataset_valid: Optional[Union[BaseDataset, np.ndarray]] = None,
-            y_valid: Optional[np.ndarray] = None,
-            n_class: Optional[int] = None,
-            balance: Optional[np.ndarray] = None,
-            **kwargs: Any):
+    def fit(
+        self,
+        dataset_train: Union[BaseDataset, np.ndarray],
+        dataset_valid: Optional[Union[BaseDataset, np.ndarray]] = None,
+        y_valid: Optional[np.ndarray] = None,
+        n_class: Optional[int] = None,
+        balance: Optional[np.ndarray] = None,
+        **kwargs: Any,
+    ):
         if isinstance(dataset_train, BaseDataset):
             if n_class is not None:
                 assert n_class == dataset_train.n_class
@@ -38,7 +40,9 @@ class MajorityWeightedVoting(BaseLabelModel):
         else:
             self.balance = balance
 
-    def predict_proba(self, dataset: Union[BaseDataset, np.ndarray], **kwargs: Any) -> np.ndarray:
+    def predict_proba(
+        self, dataset: Union[BaseDataset, np.ndarray], **kwargs: Any
+    ) -> np.ndarray:
         L = check_weak_labels(dataset)
 
         n_class = len(self.balance)
@@ -62,10 +66,12 @@ class MajorityVoting(BaseLabelModel):
         super().__init__()
         self.n_class = None
 
-    def fit(self,
-            dataset_train: Union[BaseDataset, np.ndarray],
-            n_class: Optional[int] = None,
-            **kwargs: Any):
+    def fit(
+        self,
+        dataset_train: Union[BaseDataset, np.ndarray],
+        n_class: Optional[int] = None,
+        **kwargs: Any,
+    ):
         # warnings.warn(f'MajorityVoting.fit() should not be called!')
         if isinstance(dataset_train, BaseDataset):
             if n_class is not None:
@@ -74,8 +80,12 @@ class MajorityVoting(BaseLabelModel):
                 n_class = dataset_train.n_class
         self.n_class = n_class or int(np.max(check_weak_labels(dataset_train))) + 1
 
-    def predict_proba(self, dataset: Union[BaseDataset, np.ndarray], weight: Optional[np.ndarray] = None,
-                      **kwargs: Any) -> np.ndarray:
+    def predict_proba(
+        self,
+        dataset: Union[BaseDataset, np.ndarray],
+        weight: Optional[np.ndarray] = None,
+        **kwargs: Any,
+    ) -> np.ndarray:
         L = check_weak_labels(dataset)
         if weight is None:
             weight = np.ones_like(L)

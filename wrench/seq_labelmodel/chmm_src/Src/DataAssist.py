@@ -9,8 +9,9 @@ OUT_PRECISION = 0.8
 logger = logging.getLogger(__name__)
 
 
-def span_to_label(tokens: List[str],
-                  labeled_spans: Dict[Tuple[int, int], Any]) -> List[str]:
+def span_to_label(
+    tokens: List[str], labeled_spans: Dict[Tuple[int, int], Any]
+) -> List[str]:
     """
     Convert label spans to
     :param tokens: a list of tokens
@@ -18,45 +19,46 @@ def span_to_label(tokens: List[str],
     :return: a list of string labels
     """
     if labeled_spans:
-        assert list(labeled_spans.keys())[-1][1] <= len(tokens), ValueError("label spans out of scope!")
+        assert list(labeled_spans.keys())[-1][1] <= len(tokens), ValueError(
+            "label spans out of scope!"
+        )
 
-    labels = ['O'] * len(tokens)
+    labels = ["O"] * len(tokens)
     for (start, end), label in labeled_spans.items():
         if type(label) == list or type(label) == tuple:
             lb = label[0][0]
         else:
             lb = label
-        labels[start] = 'B-' + lb
+        labels[start] = "B-" + lb
         if end - start > 1:
-            labels[start + 1: end] = ['I-' + lb] * (end - start - 1)
+            labels[start + 1 : end] = ["I-" + lb] * (end - start - 1)
 
     return labels
 
 
-def label_to_span(labels: List[str],
-                  scheme: Optional[str] = 'BIO') -> dict:
+def label_to_span(labels: List[str], scheme: Optional[str] = "BIO") -> dict:
     """
     convert labels to spans
     :param labels: a list of labels
     :param scheme: labeling scheme, in ['BIO', 'BILOU'].
     :return: labeled spans, a list of tuples (start_idx, end_idx, label)
     """
-    assert scheme in ['BIO', 'BILOU'], ValueError("unknown labeling scheme")
+    assert scheme in ["BIO", "BILOU"], ValueError("unknown labeling scheme")
 
     labeled_spans = dict()
     i = 0
     while i < len(labels):
-        if labels[i] == 'O':
+        if labels[i] == "O":
             i += 1
             continue
         else:
-            if scheme == 'BIO':
-                if labels[i][0] == 'B':
+            if scheme == "BIO":
+                if labels[i][0] == "B":
                     start = i
                     lb = labels[i][2:]
                     i += 1
                     try:
-                        while labels[i][0] == 'I':
+                        while labels[i][0] == "I":
                             i += 1
                         end = i
                         labeled_spans[(start, end)] = lb
@@ -65,21 +67,21 @@ def label_to_span(labels: List[str],
                         labeled_spans[(start, end)] = lb
                         i += 1
                 # this should not happen
-                elif labels[i][0] == 'I':
+                elif labels[i][0] == "I":
                     i += 1
-            elif scheme == 'BILOU':
-                if labels[i][0] == 'U':
+            elif scheme == "BILOU":
+                if labels[i][0] == "U":
                     start = i
                     end = i + 1
                     lb = labels[i][2:]
                     labeled_spans[(start, end)] = lb
                     i += 1
-                elif labels[i][0] == 'B':
+                elif labels[i][0] == "B":
                     start = i
                     lb = labels[i][2:]
                     i += 1
                     try:
-                        while labels[i][0] != 'L':
+                        while labels[i][0] != "L":
                             i += 1
                         end = i
                         labeled_spans[(start, end)] = lb
@@ -94,9 +96,7 @@ def label_to_span(labels: List[str],
     return labeled_spans
 
 
-def initialise_transmat(observations,
-                        label_set,
-                        src_idx=None):
+def initialise_transmat(observations, label_set, src_idx=None):
     """
     initialize transition matrix
     :param src_idx: the index of the source of which the transition statistics is computed.
@@ -112,7 +112,9 @@ def initialise_transmat(observations,
     if src_idx is not None:
         for obs in observations:
             for k in range(0, len(obs) - 1):
-                trans_counts[obs[k, src_idx].argmax(), obs[k + 1, src_idx].argmax()] += 1
+                trans_counts[
+                    obs[k, src_idx].argmax(), obs[k + 1, src_idx].argmax()
+                ] += 1
     else:
         for obs in observations:
             for k in range(0, len(obs) - 1):
@@ -130,16 +132,13 @@ def initialise_transmat(observations,
 
     transmat_prior = trans_counts + 1
     # initialize transition matrix with dirichlet distribution
-    transmat_ = np.vstack([np.random.dirichlet(trans_counts2 + 1E-10)
-                           for trans_counts2 in trans_counts])
+    transmat_ = np.vstack(
+        [np.random.dirichlet(trans_counts2 + 1e-10) for trans_counts2 in trans_counts]
+    )
     return transmat_, transmat_prior
 
 
-def initialise_emissions(observations,
-                         label_set,
-                         sources,
-                         src_priors,
-                         strength=1000):
+def initialise_emissions(observations, label_set, sources, src_priors, strength=1000):
     """
     initialize emission matrices
     :param sources: source names
@@ -162,14 +161,13 @@ def initialise_emissions(observations,
             if pos_label[2:] in src_priors[source]:
                 obs_counts[source_index, pos_index] += 1
     # construct probability distribution from counts
-    obs_probs = obs_counts / (obs_counts.sum(axis=1, keepdims=True) + 1E-3)
+    obs_probs = obs_counts / (obs_counts.sum(axis=1, keepdims=True) + 1e-3)
 
     # initialize emission matrix
     matrix = np.zeros((len(sources), len(label_set), len(label_set)))
 
     for source_index, source in enumerate(sources):
         for pos_index, pos_label in enumerate(label_set):
-
             # Simple case: set P(O=x|Y=x) to be the recall
             recall = 0
             if pos_index == 0:
@@ -190,7 +188,11 @@ def initialise_emissions(observations,
 
                 # Otherwise, we set the probability to be inversely proportional to the precision
                 # and the (unconditional) probability of the observation
-                error_prob = (1 - recall) * (1 - precision) * (0.001 + obs_probs[source_index, pos_index2])
+                error_prob = (
+                    (1 - recall)
+                    * (1 - precision)
+                    * (0.001 + obs_probs[source_index, pos_index2])
+                )
 
                 # We increase the probability for boundary errors (i.e. I-ORG -> B-ORG)
                 if pos_index > 0 and pos_index2 > 0 and pos_label[2:] == pos_label2[2:]:
@@ -204,7 +206,9 @@ def initialise_emissions(observations,
 
             error_indices = [i for i in range(len(label_set)) if i != pos_index]
             error_sum = matrix[source_index, pos_index, error_indices].sum()
-            matrix[source_index, pos_index, error_indices] /= (error_sum / (1 - recall) + 1E-5)
+            matrix[source_index, pos_index, error_indices] /= (
+                error_sum / (1 - recall) + 1e-5
+            )
 
     emission_priors = matrix * strength
     emission_probs = matrix

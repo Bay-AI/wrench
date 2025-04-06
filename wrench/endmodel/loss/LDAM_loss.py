@@ -5,7 +5,6 @@ import torch.nn.functional as F
 
 
 class LDAMLoss(nn.Module):
-
     def __init__(self, cls_num_list, max_m=0.5, weight=None, s=30, device=None):
         super(LDAMLoss, self).__init__()
         self.device = device

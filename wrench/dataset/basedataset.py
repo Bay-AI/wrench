@@ -19,11 +19,13 @@ logger = logging.getLogger(__name__)
 class BaseDataset(ABC):
     """Abstract data class."""
 
-    def __init__(self,
-                 path: str = None,
-                 split: Optional[str] = None,
-                 feature_cache_name: Optional[str] = None,
-                 **kwargs: Any) -> None:
+    def __init__(
+        self,
+        path: str = None,
+        split: Optional[str] = None,
+        feature_cache_name: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
         self.ids: List = []
         self.labels: List = []
         self.examples: List = []
@@ -55,36 +57,37 @@ class BaseDataset(ABC):
         self
         """
 
-        assert split in ["train", "valid", "test"], 'Parameter "split" must be in ["train", "valid", "test", None]'
+        assert split in ["train", "valid", "test"], (
+            'Parameter "split" must be in ["train", "valid", "test", None]'
+        )
 
         path = Path(path)
 
         self.split = split
         self.path = path
 
-        data_path = path / f'{split}.json'
-        logger.info(f'loading data from {data_path}')
-        data = json.load(open(data_path, 'r'))
+        data_path = path / f"{split}.json"
+        logger.info(f"loading data from {data_path}")
+        data = json.load(open(data_path, "r"))
         for i, item in tqdm(data.items()):
             self.ids.append(i)
-            self.labels.append(item['label'])
-            self.weak_labels.append(item['weak_labels'])
-            self.examples.append(item['data'])
+            self.labels.append(item["label"])
+            self.weak_labels.append(item["weak_labels"])
+            self.examples.append(item["data"])
 
-        label_path = self.path / f'label.json'
-        self.id2label = {int(k): v for k, v in json.load(open(label_path, 'r')).items()}
+        label_path = self.path / "label.json"
+        self.id2label = {int(k): v for k, v in json.load(open(label_path, "r")).items()}
 
         return self
 
     def load_labeled_ids_and_lf_exemplars(self, path: str):
-
         path = Path(path)
 
-        assert self.split == 'train', 'labeled data can only be loaded by train'
-        logger.info(f'loading labeled ids and lf exemplars from {path}')
-        data = json.load(open(path, 'r'))
-        labeled_ids = data.get('labeled_ids', [])
-        lf_exemplar_ids = data.get('lf_exemplar_ids', [])
+        assert self.split == "train", "labeled data can only be loaded by train"
+        logger.info(f"loading labeled ids and lf exemplars from {path}")
+        data = json.load(open(path, "r"))
+        labeled_ids = data.get("labeled_ids", [])
+        lf_exemplar_ids = data.get("lf_exemplar_ids", [])
 
         # map to real data idx in self
         labeled_ids = [self.ids.index(i) for i in labeled_ids]
@@ -108,29 +111,31 @@ class BaseDataset(ABC):
             self.features = None
             return None
 
-        path = self.path / f'{self.split}_{cache_name}.pkl'
-        logger.info(f'loading features from {path}')
-        features = pickle.load(open(path, 'rb'))
+        path = self.path / f"{self.split}_{cache_name}.pkl"
+        logger.info(f"loading features from {path}")
+        features = pickle.load(open(path, "rb"))
         self.features = features
         return features
 
     def save_features(self, cache_name: Optional[str] = None):
         if cache_name is None:
             return None
-        path = self.path / f'{self.split}_{cache_name}.pkl'
-        logger.info(f'saving features into {path}')
-        pickle.dump(self.features, open(path, 'wb'), protocol=4)
+        path = self.path / f"{self.split}_{cache_name}.pkl"
+        logger.info(f"saving features into {path}")
+        pickle.dump(self.features, open(path, "wb"), protocol=4)
         return path
 
-    def extract_feature(self,
-                        extract_fn: Union[str, Callable],
-                        return_extractor: bool,
-                        cache_name: str = None,
-                        force: bool = False,
-                        normalize=False,
-                        **kwargs: Any):
+    def extract_feature(
+        self,
+        extract_fn: Union[str, Callable],
+        return_extractor: bool,
+        cache_name: str = None,
+        force: bool = False,
+        normalize=False,
+        **kwargs: Any,
+    ):
         if cache_name is not None:
-            path = self.path / f'{self.split}_{cache_name}.pkl'
+            path = self.path / f"{self.split}_{cache_name}.pkl"
             if path.exists() and (not force):
                 self.load_features(cache_name=cache_name)
                 return
@@ -138,7 +143,9 @@ class BaseDataset(ABC):
         if isinstance(extract_fn, Callable):
             self.features = extract_fn(self.examples)
         else:
-            extractor = self.extract_feature_(extract_fn=extract_fn, return_extractor=return_extractor, **kwargs)
+            extractor = self.extract_feature_(
+                extract_fn=extract_fn, return_extractor=return_extractor, **kwargs
+            )
             if normalize:
                 features = self.features
                 scaler = preprocessing.StandardScaler().fit(features)
@@ -196,15 +203,25 @@ class BaseDataset(ABC):
             return list(idx)
 
     def get_covered_subset(self):
-        idx = [i for i in range(len(self)) if np.any(np.array(self.weak_labels[i]) != -1)]
+        idx = [
+            i for i in range(len(self)) if np.any(np.array(self.weak_labels[i]) != -1)
+        ]
         return self.create_subset(idx)
 
     def get_conflict_labeled_subset(self):
-        idx = [i for i in range(len(self)) if len({l for l in set(self.weak_labels[i]) if l != -1}) > 1]
+        idx = [
+            i
+            for i in range(len(self))
+            if len({l for l in set(self.weak_labels[i]) if l != -1}) > 1
+        ]
         return self.create_subset(idx)
 
     def get_agreed_labeled_subset(self):
-        idx = [i for i in range(len(self)) if len({l for l in set(self.weak_labels[i]) if l != -1}) == 1]
+        idx = [
+            i
+            for i in range(len(self))
+            if len({l for l in set(self.weak_labels[i]) if l != -1}) == 1
+        ]
         return self.create_subset(idx)
 
     def lf_summary(self):
@@ -218,38 +235,44 @@ class BaseDataset(ABC):
         L = np.array(self.weak_labels)
         Y = np.array(self.labels)
 
-        summary_d['n_class'] = self.n_class
-        summary_d['n_data'], summary_d['n_lfs'] = L.shape
-        summary_d['n_uncovered_data'] = np.sum(np.all(L == -1, axis=1))
-        uncovered_rate = summary_d['n_uncovered_data'] / summary_d['n_data']
-        summary_d['overall_coverage'] = (1 - uncovered_rate)
+        summary_d["n_class"] = self.n_class
+        summary_d["n_data"], summary_d["n_lfs"] = L.shape
+        summary_d["n_uncovered_data"] = np.sum(np.all(L == -1, axis=1))
+        uncovered_rate = summary_d["n_uncovered_data"] / summary_d["n_data"]
+        summary_d["overall_coverage"] = 1 - uncovered_rate
 
         lf_summary = LFAnalysis(L=L).lf_summary(Y=Y)
-        summary_d['lf_avr_acc'] = lf_summary['Emp. Acc.'].mean()
-        summary_d['lf_var_acc'] = lf_summary['Emp. Acc.'].var()
-        summary_d['lf_avr_propensity'] = lf_summary['Coverage'].mean()
-        summary_d['lf_var_propensity'] = lf_summary['Coverage'].var()
-        summary_d['lf_avr_overlap'] = lf_summary['Overlaps'].mean()
-        summary_d['lf_var_overlap'] = lf_summary['Overlaps'].var()
-        summary_d['lf_avr_conflict'] = lf_summary['Conflicts'].mean()
-        summary_d['lf_var_conflict'] = lf_summary['Conflicts'].var()
+        summary_d["lf_avr_acc"] = lf_summary["Emp. Acc."].mean()
+        summary_d["lf_var_acc"] = lf_summary["Emp. Acc."].var()
+        summary_d["lf_avr_propensity"] = lf_summary["Coverage"].mean()
+        summary_d["lf_var_propensity"] = lf_summary["Coverage"].var()
+        summary_d["lf_avr_overlap"] = lf_summary["Overlaps"].mean()
+        summary_d["lf_var_overlap"] = lf_summary["Overlaps"].var()
+        summary_d["lf_avr_conflict"] = lf_summary["Conflicts"].mean()
+        summary_d["lf_var_conflict"] = lf_summary["Conflicts"].var()
 
         # calc cmi
         from ..utils import calc_cmi_matrix, cluster_based_accuracy_variance
+
         cmi_matrix = calc_cmi_matrix(Y, L)
         lf_cmi = np.ma.masked_invalid(cmi_matrix).mean(1).data
-        summary_d['correlation'] = lf_cmi.mean()
-        lf_summary['correlation'] = pd.Series(lf_cmi)
+        summary_d["correlation"] = lf_cmi.mean()
+        lf_summary["correlation"] = pd.Series(lf_cmi)
 
         # calc data dependency
-        if hasattr(self, 'features') and features is None:
+        if hasattr(self, "features") and features is None:
             features = self.features
         if features is not None:
             kmeans = KMeans(n_clusters=n_clusters).fit(features)
             cluster_labels = kmeans.labels_
-            acc_var = np.array([cluster_based_accuracy_variance(Y, L[:, i], cluster_labels) for i in range(self.n_lf)])
-            summary_d['data-dependency'] = acc_var.mean()
-            lf_summary['data-dependency'] = pd.Series(acc_var)
+            acc_var = np.array(
+                [
+                    cluster_based_accuracy_variance(Y, L[:, i], cluster_labels)
+                    for i in range(self.n_lf)
+                ]
+            )
+            summary_d["data-dependency"] = acc_var.mean()
+            lf_summary["data-dependency"] = pd.Series(acc_var)
 
         if return_lf_summary:
             return summary_d, lf_summary

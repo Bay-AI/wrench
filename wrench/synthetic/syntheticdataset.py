@@ -9,8 +9,14 @@ from ..dataset.basedataset import BaseDataset
 
 
 class BaseSyntheticGenerator(ABC):
-    def __init__(self, n_class: int, n_lfs: int, class_prior: Optional[Union[list, np.ndarray]] = None,
-                 lf_prior: Optional[Union[list, np.ndarray]] = None, random_state=None):
+    def __init__(
+        self,
+        n_class: int,
+        n_lfs: int,
+        class_prior: Optional[Union[list, np.ndarray]] = None,
+        lf_prior: Optional[Union[list, np.ndarray]] = None,
+        random_state=None,
+    ):
         self.generator = check_random_state(random_state)
 
         self.n_class = n_class
@@ -25,9 +31,11 @@ class BaseSyntheticGenerator(ABC):
 
         self.id2labels = {i: i for i in range(n_class)}
 
-    def generate_split(self, split: str = 'train', n_data: int = 1000):
+    def generate_split(self, split: str = "train", n_data: int = 1000):
         generated = self.generate(n_data=n_data)
-        dataset = SyntheticDataset(split=split, id2label=self.id2labels.copy(), **generated)
+        dataset = SyntheticDataset(
+            split=split, id2label=self.id2labels.copy(), **generated
+        )
         return dataset
 
     def sample_other_label(self, label):
@@ -44,15 +52,17 @@ class BaseSyntheticGenerator(ABC):
 class SyntheticDataset(BaseDataset):
     """Data class for synthetic dataset."""
 
-    def __init__(self,
-                 split: str,
-                 ids: List,
-                 labels: List,
-                 examples: List,
-                 weak_labels: List[List],
-                 id2label: Dict,
-                 features: Optional[np.ndarray] = None,
-                 **kwargs: Any) -> None:
+    def __init__(
+        self,
+        split: str,
+        ids: List,
+        labels: List,
+        examples: List,
+        weak_labels: List[List],
+        id2label: Dict,
+        features: Optional[np.ndarray] = None,
+        **kwargs: Any,
+    ) -> None:
         self.ids = ids
         self.labels = labels
         self.examples = examples
@@ -81,10 +91,17 @@ class SyntheticDataset(BaseDataset):
         else:
             features = None
 
-        dataset = self.__class__(split=self.split, id2label=self.id2label.copy(),
-                                 ids=ids, labels=labels, examples=examples, weak_labels=weak_labels, features=features)
+        dataset = self.__class__(
+            split=self.split,
+            id2label=self.id2label.copy(),
+            ids=ids,
+            labels=labels,
+            examples=examples,
+            weak_labels=weak_labels,
+            features=features,
+        )
 
         return dataset
 
     def extract_feature_(self, **kwargs: Any):
-        warnings.warn(f'synthetic dataset have no feature!')
+        warnings.warn("synthetic dataset have no feature!")

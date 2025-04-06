@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 # following funcs assume O is indexed a 0, and B is odd, I is even!
 
+
 def bio_id_to_io_id(a):
     return np.where(a > 0, np.where(a % 2 == 0, a / 2, (a + 1) / 2), a).astype(int)
 
@@ -32,7 +33,7 @@ def io_id_to_bio_id(a):
 
 
 def check_weak_labels_seq(dataset: BaseSeqDataset, bio_to_io=True):
-    assert dataset.weak_labels is not None, f'Input dataset has no weak labels!'
+    assert dataset.weak_labels is not None, "Input dataset has no weak labels!"
     L, Y, indexes = dataset.flatten()
     if bio_to_io:
         L = bio_id_to_io_id(L)
@@ -43,7 +44,7 @@ def check_weak_labels_seq(dataset: BaseSeqDataset, bio_to_io=True):
 class SeqLabelModelWrapper(BaseSeqModel):
     def __init__(self, label_model_class, **kwargs: Any):
         super().__init__()
-        self.hyperparas = {'label_model_class': label_model_class}
+        self.hyperparas = {"label_model_class": label_model_class}
         self.hyperparas.update(**kwargs)
         self.label_model = None
 
@@ -55,16 +56,19 @@ class SeqLabelModelWrapper(BaseSeqModel):
                 # for a token, if all LFs label "O", we do not change anything;
                 # if some LFs label non-"O", we treat other LFs (which label "O") abstaining.
                 if np.max(dataset.weak_labels[i][j]) > 0:
-                    dataset.weak_labels[i][j] = [x if x > 0 else -1 for x in dataset.weak_labels[i][j]]
+                    dataset.weak_labels[i][j] = [
+                        x if x > 0 else -1 for x in dataset.weak_labels[i][j]
+                    ]
         return dataset
 
-    def fit(self,
-            dataset_train: BaseSeqDataset,
-            dataset_valid: Optional[BaseSeqDataset] = None,
-            y_valid: Optional[List[List]] = None,
-            bio_to_io: Optional[bool] = True,
-            **kwargs: Any):
-
+    def fit(
+        self,
+        dataset_train: BaseSeqDataset,
+        dataset_valid: Optional[BaseSeqDataset] = None,
+        y_valid: Optional[List[List]] = None,
+        bio_to_io: Optional[bool] = True,
+        **kwargs: Any,
+    ):
         self.bio_to_io = bio_to_io
         dataset_train = self.transform_labeling_function(dataset_train)
         L, _, indexes = check_weak_labels_seq(dataset_train, bio_to_io)
@@ -81,17 +85,25 @@ class SeqLabelModelWrapper(BaseSeqModel):
         self.n_class = n_class
 
         hyperparas = deepcopy(self.hyperparas)
-        label_model_class = hyperparas.pop('label_model_class')
+        label_model_class = hyperparas.pop("label_model_class")
         self.label_model = label_model_class(**hyperparas)
-        self.label_model.fit(dataset_train=L, y_valid=y_valid, n_class=n_class, **kwargs)
+        self.label_model.fit(
+            dataset_train=L, y_valid=y_valid, n_class=n_class, **kwargs
+        )
 
-    def predict(self, dataset: BaseSeqDataset, weight: Optional[np.ndarray] = None,
-                **kwargs: Any):
+    def predict(
+        self,
+        dataset: BaseSeqDataset,
+        weight: Optional[np.ndarray] = None,
+        **kwargs: Any,
+    ):
         dataset = self.transform_labeling_function(dataset)
         L, _, indexes = check_weak_labels_seq(dataset, self.bio_to_io)
 
         y_pred = self.label_model.predict(L)
-        preds = [list(y_pred[start:end]) for (start, end) in zip(indexes[:-1], indexes[1:])]
+        preds = [
+            list(y_pred[start:end]) for (start, end) in zip(indexes[:-1], indexes[1:])
+        ]
         if self.bio_to_io:
             preds = [io_id_to_bio_id(i) for i in preds]
         return preds

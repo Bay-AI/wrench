@@ -23,15 +23,15 @@ logger = logging.getLogger(__name__)
 
 
 def quit_function(fn_name):
-    print(f'[TIMEOUT] {fn_name} take too long!', file=sys.stderr)
+    print(f"[TIMEOUT] {fn_name} take too long!", file=sys.stderr)
     sys.stderr.flush()  # Python 3 stderr is likely buffered.
     thread.interrupt_main()  # raises KeyboardInterrupt
 
 
 def exit_after(s):
-    '''
+    """
     use as decorator to exit process if function takes longer than s seconds
-    '''
+    """
 
     def outer(fn):
         def inner(*args, **kwargs):
@@ -59,7 +59,9 @@ class StopWhenNotImproved:
         self.trial_cnt = 0
         self.best_value = None
 
-    def __call__(self, study: optuna.study.Study, trial: optuna.trial.FrozenTrial) -> None:
+    def __call__(
+        self, study: optuna.study.Study, trial: optuna.trial.FrozenTrial
+    ) -> None:
         if trial.state == optuna.trial.TrialState.COMPLETE:
             self.trial_cnt += 1
             current_value = trial.value
@@ -84,12 +86,16 @@ class RecordCallback:
         self.record = {}
         self.trial_cnt = 0
 
-    def __call__(self, study: optuna.study.Study, trial: optuna.trial.FrozenTrial) -> None:
+    def __call__(
+        self, study: optuna.study.Study, trial: optuna.trial.FrozenTrial
+    ) -> None:
         if trial.state == optuna.trial.TrialState.COMPLETE:
             self.record[self.trial_cnt] = trial.params
             self.record[self.trial_cnt][self.metric] = trial.value
             self.trial_cnt += 1
-            json.dump(self.record, open(self.save_path / 'search_record.json', 'w'), indent=4)
+            json.dump(
+                self.record, open(self.save_path / "search_record.json", "w"), indent=4
+            )
 
 
 class RandomGridSampler(GridSampler):
@@ -103,76 +109,140 @@ class RandomGridSampler(GridSampler):
 
 
 def fetch_hyperparas_suggestions(search_space: Dict, trial: Trial):
-    return {key: trial.suggest_categorical(key, search_space[key]) for key in search_space}
+    return {
+        key: trial.suggest_categorical(key, search_space[key]) for key in search_space
+    }
 
 
-def single_process(item, model, dataset_train, y_train, dataset_valid, y_valid, metric, direction, kwargs):
+def single_process(
+    item,
+    model,
+    dataset_train,
+    y_train,
+    dataset_valid,
+    y_valid,
+    metric,
+    direction,
+    kwargs,
+):
     suggestions, i = item
     kwargs = kwargs.copy()
     m = deepcopy(model)
-    m.fit(dataset_train=dataset_train, y_train=y_train, dataset_valid=dataset_valid, y_valid=y_valid,
-          verbose=True, metric=metric, direction=direction, **suggestions, **kwargs)
+    m.fit(
+        dataset_train=dataset_train,
+        y_train=y_train,
+        dataset_valid=dataset_valid,
+        y_valid=y_valid,
+        verbose=True,
+        metric=metric,
+        direction=direction,
+        **suggestions,
+        **kwargs,
+    )
     value = m.test(dataset_valid, metric_fn=metric)
     return value
 
 
-def single_process_with_y_train(item, model, dataset_train, y_train, dataset_valid, y_valid, metric, direction, kwargs):
+def single_process_with_y_train(
+    item,
+    model,
+    dataset_train,
+    y_train,
+    dataset_valid,
+    y_valid,
+    metric,
+    direction,
+    kwargs,
+):
     suggestions, i = item
     kwargs = kwargs.copy()
-    y_train_l = kwargs.pop('y_train_l')
+    y_train_l = kwargs.pop("y_train_l")
     y_train = y_train_l[i]
     m = deepcopy(model)
-    m.fit(dataset_train=dataset_train, y_train=y_train, dataset_valid=dataset_valid, y_valid=y_valid,
-          verbose=False, metric=metric, direction=direction, **suggestions, **kwargs)
+    m.fit(
+        dataset_train=dataset_train,
+        y_train=y_train,
+        dataset_valid=dataset_valid,
+        y_valid=y_valid,
+        verbose=False,
+        metric=metric,
+        direction=direction,
+        **suggestions,
+        **kwargs,
+    )
     value = m.test(dataset_valid, metric_fn=metric)
     return value
 
 
-def single_process_with_seed(item, model, dataset_train, y_train, dataset_valid, y_valid, metric, direction, kwargs):
+def single_process_with_seed(
+    item,
+    model,
+    dataset_train,
+    y_train,
+    dataset_valid,
+    y_valid,
+    metric,
+    direction,
+    kwargs,
+):
     suggestions, i = item
     kwargs = kwargs.copy()
-    seeds = kwargs.pop('seeds')
+    seeds = kwargs.pop("seeds")
     seed = seeds[i]
     m = deepcopy(model)
-    m.fit(dataset_train=dataset_train, y_train=y_train, dataset_valid=dataset_valid, y_valid=y_valid,
-          verbose=False, metric=metric, direction=direction, seed=seed, **suggestions, **kwargs)
+    m.fit(
+        dataset_train=dataset_train,
+        y_train=y_train,
+        dataset_valid=dataset_valid,
+        y_valid=y_valid,
+        verbose=False,
+        metric=metric,
+        direction=direction,
+        seed=seed,
+        **suggestions,
+        **kwargs,
+    )
     value = m.test(dataset_valid, metric_fn=metric)
     return value
 
 
-def grid_search(model: BaseModel,
-                search_space: Dict,
-                dataset_train,
-                dataset_valid,
-                y_train=None,
-                y_valid=None,
-                process_fn: Callable = single_process,
-                filter_fn: Optional[Callable] = None,
-                metric: Optional[Union[str, Callable]] = 'f1_macro',
-                direction: Optional[str] = 'auto',
-                n_repeats: Optional[int] = 1,
-                n_trials: Optional[int] = 100,
-                n_jobs: Optional[int] = 1,
-                min_trials: Optional[Union[int, float]] = -1,
-                study_patience: Optional[Union[int, float]] = -1,
-                prune_threshold: Optional[float] = -1,
-                trial_timeout: Optional[int] = -1,
-                study_timeout: Optional[int] = None,
-                parallel: Optional[bool] = False,
-                study_name: Optional[str] = None,
-                save_path: Optional[str] = None,
-                **kwargs: Any):
-    if direction == 'auto':
+def grid_search(
+    model: BaseModel,
+    search_space: Dict,
+    dataset_train,
+    dataset_valid,
+    y_train=None,
+    y_valid=None,
+    process_fn: Callable = single_process,
+    filter_fn: Optional[Callable] = None,
+    metric: Optional[Union[str, Callable]] = "f1_macro",
+    direction: Optional[str] = "auto",
+    n_repeats: Optional[int] = 1,
+    n_trials: Optional[int] = 100,
+    n_jobs: Optional[int] = 1,
+    min_trials: Optional[Union[int, float]] = -1,
+    study_patience: Optional[Union[int, float]] = -1,
+    prune_threshold: Optional[float] = -1,
+    trial_timeout: Optional[int] = -1,
+    study_timeout: Optional[int] = None,
+    parallel: Optional[bool] = False,
+    study_name: Optional[str] = None,
+    save_path: Optional[str] = None,
+    **kwargs: Any,
+):
+    if direction == "auto":
         direction = metric_to_direction(metric)
-    worker = partial(process_fn,
-                     model=model,
-                     dataset_train=dataset_train,
-                     y_train=y_train,
-                     dataset_valid=dataset_valid,
-                     y_valid=y_valid,
-                     metric=metric,
-                     direction=direction,
-                     kwargs=kwargs)
+    worker = partial(
+        process_fn,
+        model=model,
+        dataset_train=dataset_train,
+        y_train=y_train,
+        dataset_valid=dataset_valid,
+        y_valid=y_valid,
+        metric=metric,
+        direction=direction,
+        kwargs=kwargs,
+    )
     study = optuna.create_study(
         study_name=study_name,
         sampler=RandomGridSampler(search_space, filter_fn=filter_fn),
@@ -187,24 +257,39 @@ def grid_search(model: BaseModel,
 
     callbacks = []
     if study_patience > 0:
-        callbacks.append(StopWhenNotImproved(patience=study_patience, min_trials=min_trials))
+        callbacks.append(
+            StopWhenNotImproved(patience=study_patience, min_trials=min_trials)
+        )
     if save_path is not None:
         callbacks.append(RecordCallback(metric=metric, save_path=save_path))
 
     if parallel:
-        if trial_timeout > 0: warnings.warn('Parallel searching does not support trial time out!')
+        if trial_timeout > 0:
+            warnings.warn("Parallel searching does not support trial time out!")
         ctx = multiprocessing.get_context("spawn")
         pool = ctx.Pool(n_repeats)
 
         def parallel_objective(trial: Trial):
             suggestions = fetch_hyperparas_suggestions(search_space, trial)
             metric_value = 0
-            for val in tqdm(pool.imap_unordered(worker, [(suggestions, i) for i in range(n_repeats)]), total=n_repeats):
+            for val in tqdm(
+                pool.imap_unordered(
+                    worker, [(suggestions, i) for i in range(n_repeats)]
+                ),
+                total=n_repeats,
+            ):
                 metric_value += val
             value = metric_value / n_repeats
             return value
 
-        study.optimize(parallel_objective, n_trials=n_trials, n_jobs=n_jobs, catch=(Exception,), callbacks=callbacks, timeout=study_timeout)
+        study.optimize(
+            parallel_objective,
+            n_trials=n_trials,
+            n_jobs=n_jobs,
+            catch=(Exception,),
+            callbacks=callbacks,
+            timeout=study_timeout,
+        )
 
     else:
 
@@ -217,14 +302,25 @@ def grid_search(model: BaseModel,
                     val = worker((suggestions, i))
                     metric_value += val
                     if prune_threshold > 0 and trial._trial_id > 0:
-                        if (trial.study.best_value - val) > (prune_threshold * trial.study.best_value):
+                        if (trial.study.best_value - val) > (
+                            prune_threshold * trial.study.best_value
+                        ):
                             return metric_value / (i + 1)
                 value = metric_value / n_repeats
                 return value
             except KeyboardInterrupt:
-                raise Exception('[KeyboardInterrupt] may due to timeout')
+                raise Exception("[KeyboardInterrupt] may due to timeout")
 
-        study.optimize(objective, n_trials=n_trials, n_jobs=n_jobs, catch=(Exception,), callbacks=callbacks, timeout=study_timeout)
+        study.optimize(
+            objective,
+            n_trials=n_trials,
+            n_jobs=n_jobs,
+            catch=(Exception,),
+            callbacks=callbacks,
+            timeout=study_timeout,
+        )
 
-    logger.info(f'[END: BEST VAL / PARAMS] Best value: {study.best_value}, Best paras: {study.best_params}')
+    logger.info(
+        f"[END: BEST VAL / PARAMS] Best value: {study.best_value}, Best paras: {study.best_params}"
+    )
     return study.best_params

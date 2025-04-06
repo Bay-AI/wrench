@@ -65,12 +65,12 @@ class LabelModel(LabelModel_):
             # All maximal cliques are +1
             for i in self.c_tree.nodes():
                 node = self.c_tree.node[i]
-                jtm[node["start_index"]: node["end_index"]] = 1
+                jtm[node["start_index"] : node["end_index"]] = 1
 
             # All separator sets are -1
             for i, j in self.c_tree.edges():
                 edge = self.c_tree[i][j]
-                jtm[edge["start_index"]: edge["end_index"]] = 1
+                jtm[edge["start_index"] : edge["end_index"]] = 1
         else:
             jtm = np.ones(L_aug.shape[1])
 
@@ -81,31 +81,34 @@ class LabelModel(LabelModel_):
 
 
 class MeTaL(BaseLabelModel):
-    def __init__(self,
-                 lr: Optional[float] = 0.001,
-                 l2: Optional[float] = 0.0,
-                 n_epochs: Optional[int] = 1000,
-                 seed: Optional[int] = None,
-                 **kwargs: Any):
+    def __init__(
+        self,
+        lr: Optional[float] = 0.001,
+        l2: Optional[float] = 0.0,
+        n_epochs: Optional[int] = 1000,
+        seed: Optional[int] = None,
+        **kwargs: Any,
+    ):
         super().__init__()
         self.hyperparas = {
-            'lr'      : lr,
-            'l2'      : l2,
-            'n_epochs': n_epochs,
-            'seed'    : seed or np.random.randint(1e6),
+            "lr": lr,
+            "l2": l2,
+            "n_epochs": n_epochs,
+            "seed": seed or np.random.randint(1e6),
         }
         self.model = None
 
-    def fit(self,
-            dataset_train: Union[BaseDataset, np.ndarray],
-            dataset_valid: Optional[Union[BaseDataset, np.ndarray]] = None,
-            y_valid: Optional[np.ndarray] = None,
-            n_class: Optional[int] = None,
-            balance: Optional[np.ndarray] = None,
-            dependency_graph: Optional[List] = [],
-            verbose: Optional[bool] = False,
-            **kwargs: Any):
-
+    def fit(
+        self,
+        dataset_train: Union[BaseDataset, np.ndarray],
+        dataset_valid: Optional[Union[BaseDataset, np.ndarray]] = None,
+        y_valid: Optional[np.ndarray] = None,
+        n_class: Optional[int] = None,
+        balance: Optional[np.ndarray] = None,
+        dependency_graph: Optional[List] = [],
+        verbose: Optional[bool] = False,
+        **kwargs: Any,
+    ):
         self._update_hyperparas(**kwargs)
         if isinstance(dataset_train, BaseDataset):
             if n_class is not None:
@@ -121,20 +124,22 @@ class MeTaL(BaseLabelModel):
         n_class = len(balance)
         self.n_class = n_class
 
-        label_model = LabelModel(k=n_class, seed=self.hyperparas['seed'])
+        label_model = LabelModel(k=n_class, seed=self.hyperparas["seed"])
         label_model.train_model(
             L_train=L + 1,
             class_balance=balance,
             deps=dependency_graph,
-            n_epochs=self.hyperparas['n_epochs'],
-            lr=self.hyperparas['lr'],
-            l2=self.hyperparas['l2'],
-            seed=self.hyperparas['seed'],
-            verbose=verbose
+            n_epochs=self.hyperparas["n_epochs"],
+            lr=self.hyperparas["lr"],
+            l2=self.hyperparas["l2"],
+            seed=self.hyperparas["seed"],
+            verbose=verbose,
         )
 
         self.model = label_model
 
-    def predict_proba(self, dataset: Union[BaseDataset, np.ndarray], **kwargs: Any) -> np.ndarray:
+    def predict_proba(
+        self, dataset: Union[BaseDataset, np.ndarray], **kwargs: Any
+    ) -> np.ndarray:
         L = check_weak_labels(dataset)
         return self.model.predict_proba(L + 1)

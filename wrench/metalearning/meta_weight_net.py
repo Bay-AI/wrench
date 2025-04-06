@@ -32,28 +32,27 @@ class VNet(nn.Module):
 
 
 class MetaWeightNet(BaseTorchClassModel):
-    def __init__(self,
-                 hidden_size: Optional[int] = 100,
-
-                 batch_size: Optional[int] = 16,
-                 test_batch_size: Optional[int] = 16,
-                 n_steps: Optional[int] = 10000,
-                 grad_norm: Optional[float] = -1,
-                 use_lr_scheduler: Optional[bool] = False,
-                 binary_mode: Optional[bool] = False,
-                 **kwargs: Any
-                 ):
+    def __init__(
+        self,
+        hidden_size: Optional[int] = 100,
+        batch_size: Optional[int] = 16,
+        test_batch_size: Optional[int] = 16,
+        n_steps: Optional[int] = 10000,
+        grad_norm: Optional[float] = -1,
+        use_lr_scheduler: Optional[bool] = False,
+        binary_mode: Optional[bool] = False,
+        **kwargs: Any,
+    ):
         super().__init__()
         self.hyperparas = {
-            'hidden_size'     : hidden_size,
-
-            'batch_size'      : batch_size,
-            'real_batch_size' : batch_size,
-            'test_batch_size' : test_batch_size,
-            'n_steps'         : n_steps,
-            'grad_norm'       : grad_norm,
-            'use_lr_scheduler': use_lr_scheduler,
-            'binary_mode'     : binary_mode,
+            "hidden_size": hidden_size,
+            "batch_size": batch_size,
+            "real_batch_size": batch_size,
+            "test_batch_size": test_batch_size,
+            "n_steps": n_steps,
+            "grad_norm": grad_norm,
+            "use_lr_scheduler": use_lr_scheduler,
+            "binary_mode": binary_mode,
         }
         self.vnet: Optional[VNet] = None
         self.model: Optional[BackBone] = None
@@ -62,32 +61,30 @@ class MetaWeightNet(BaseTorchClassModel):
             use_optimizer=True,
             use_lr_scheduler=use_lr_scheduler,
             use_backbone=True,
-            **kwargs
+            **kwargs,
         )
-        self.v_net_config = Config(
-            {},
-            prefix='v_net',
-            use_optimizer=True,
-            **kwargs
-        )
-        self.is_bert = self.config.backbone_config['name'] == 'BERT'
+        self.v_net_config = Config({}, prefix="v_net", use_optimizer=True, **kwargs)
+        self.is_bert = self.config.backbone_config["name"] == "BERT"
         if self.is_bert:
-            self.tokenizer = AutoTokenizer.from_pretrained(self.config.backbone_config['paras']['model_name'])
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.config.backbone_config["paras"]["model_name"]
+            )
 
-    def fit(self,
-            dataset_train: BaseDataset,
-            y_train: Optional[np.ndarray] = None,
-            dataset_valid: BaseDataset = None,
-            y_valid: Optional[np.ndarray] = None,
-            evaluation_step: Optional[int] = 10,
-            metric: Optional[Union[str, Callable]] = 'acc',
-            direction: Optional[str] = 'auto',
-            patience: Optional[int] = 100,
-            tolerance: Optional[float] = -1.0,
-            device: Optional[torch.device] = None,
-            verbose: Optional[bool] = True,
-            **kwargs: Any):
-
+    def fit(
+        self,
+        dataset_train: BaseDataset,
+        y_train: Optional[np.ndarray] = None,
+        dataset_valid: BaseDataset = None,
+        y_valid: Optional[np.ndarray] = None,
+        evaluation_step: Optional[int] = 10,
+        metric: Optional[Union[str, Callable]] = "acc",
+        direction: Optional[str] = "auto",
+        patience: Optional[int] = 100,
+        tolerance: Optional[float] = -1.0,
+        device: Optional[torch.device] = None,
+        verbose: Optional[bool] = True,
+        **kwargs: Any,
+    ):
         assert dataset_valid is not None
 
         if not verbose:
@@ -100,7 +97,7 @@ class MetaWeightNet(BaseTorchClassModel):
         v_net_config = self.v_net_config.update(**kwargs)
         logger.info(v_net_config)
 
-        n_steps = hyperparas['n_steps']
+        n_steps = hyperparas["n_steps"]
 
         if y_train is None:
             y_train = dataset_train.labels
@@ -110,50 +107,60 @@ class MetaWeightNet(BaseTorchClassModel):
             dataset=dataset_train,
             n_class=dataset_train.n_class,
             config=config,
-            is_bert=self.is_bert
+            is_bert=self.is_bert,
         )
         self.model = model.to(device)
 
         train_dataloader = self._init_train_dataloader(
-            dataset_train,
-            n_steps=n_steps,
-            config=config
+            dataset_train, n_steps=n_steps, config=config
         )
 
         optimizer, scheduler = self._init_optimizer_and_lr_scheduler(model, config)
 
-        vnet = VNet(1, hyperparas['hidden_size'], 1)
+        vnet = VNet(1, hyperparas["hidden_size"], 1)
         self.vnet = vnet.to(device)
 
         train_meta_dataloader = self._init_train_dataloader(
-            dataset_valid,
-            n_steps=n_steps,
-            config=config
+            dataset_valid, n_steps=n_steps, config=config
         )
         train_meta_dataloader = sample_batch(train_meta_dataloader)
 
         optimizer_vnet, _ = self._init_optimizer_and_lr_scheduler(vnet, v_net_config)
 
-        valid_flag = self._init_valid_step(dataset_valid, y_valid, metric, direction, patience, tolerance)
+        valid_flag = self._init_valid_step(
+            dataset_valid, y_valid, metric, direction, patience, tolerance
+        )
 
         history = {}
         last_step_log = {}
         try:
-            with trange(n_steps, desc=f"[TRAIN]", unit="steps", disable=not verbose, ncols=150, position=0, leave=True) as pbar:
+            with trange(
+                n_steps,
+                desc="[TRAIN]",
+                unit="steps",
+                disable=not verbose,
+                ncols=150,
+                position=0,
+                leave=True,
+            ) as pbar:
                 step = 0
                 model.train()
                 for batch in train_dataloader:
                     step += 1
 
-                    batch_idx = batch['ids'].to(device)
+                    batch_idx = batch["ids"].to(device)
                     target = y_train[batch_idx]
 
                     optimizer_vnet.zero_grad()
-                    with higher.innerloop_ctx(model, optimizer, device=device) as (meta_model, diffopt):
-
+                    with higher.innerloop_ctx(model, optimizer, device=device) as (
+                        meta_model,
+                        diffopt,
+                    ):
                         outputs = meta_model(batch)
 
-                        cost = cross_entropy_with_probs(outputs, target, reduction='none')
+                        cost = cross_entropy_with_probs(
+                            outputs, target, reduction="none"
+                        )
                         cost_v = torch.reshape(cost, (len(cost), 1))
                         v_lambda = vnet(cost_v.data)
                         l_f_meta = torch.sum(cost_v * v_lambda) / len(cost_v)
@@ -162,7 +169,7 @@ class MetaWeightNet(BaseTorchClassModel):
 
                         meta_batch = next(train_meta_dataloader)
                         outputs = meta_model(meta_batch)
-                        meta_target = meta_batch['labels'].to(device)
+                        meta_target = meta_batch["labels"].to(device)
                         meta_loss = cross_entropy_with_probs(outputs, meta_target)
 
                         meta_loss.backward()
@@ -171,7 +178,7 @@ class MetaWeightNet(BaseTorchClassModel):
 
                     optimizer.zero_grad()
                     outputs = model(batch)
-                    cost = cross_entropy_with_probs(outputs, target, reduction='none')
+                    cost = cross_entropy_with_probs(outputs, target, reduction="none")
                     cost_v = torch.reshape(cost, (len(cost), 1))
 
                     with torch.no_grad():
@@ -190,16 +197,16 @@ class MetaWeightNet(BaseTorchClassModel):
                             break
 
                         history[step] = {
-                            'loss'              : loss.item(),
-                            'meta_loss'         : meta_loss.item(),
-                            f'val_{metric}'     : metric_value,
-                            f'best_val_{metric}': self.best_metric_value,
-                            'best_step'         : self.best_step,
+                            "loss": loss.item(),
+                            "meta_loss": meta_loss.item(),
+                            f"val_{metric}": metric_value,
+                            f"best_val_{metric}": self.best_metric_value,
+                            "best_step": self.best_step,
                         }
                         last_step_log.update(history[step])
 
-                    last_step_log['loss'] = loss.item()
-                    last_step_log['meta_loss'] = meta_loss.item()
+                    last_step_log["loss"] = loss.item()
+                    last_step_log["meta_loss"] = meta_loss.item()
                     pbar.update()
                     pbar.set_postfix(ordered_dict=last_step_log)
 
@@ -207,7 +214,9 @@ class MetaWeightNet(BaseTorchClassModel):
                         break
 
         except KeyboardInterrupt:
-            logger.info(f'KeyboardInterrupt! do not terminate the process in case need to save the best model')
+            logger.info(
+                "KeyboardInterrupt! do not terminate the process in case need to save the best model"
+            )
 
         self._finalize()
 
